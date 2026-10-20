@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>School Attendance PRO - ระบบเช็คชื่อแบบทางการ</title>
-    <!-- Tailwind CSS -->
+    <title>School Attendance KIOSK PRO (Multi-Face & High-Speed)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -15,36 +14,45 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 
     <style>
-        body { font-family: 'Sarabun', sans-serif; }
+        body { font-family: 'Sarabun', sans-serif; overflow-x: hidden; }
         .section-view { display: none; }
         .section-view.active { display: block; }
-        .camera-box { position: relative; width: 100%; max-width: 640px; margin: 0 auto; background: #000; border-radius: 0.5rem; overflow: hidden; }
-        video { width: 100%; transform: scaleX(-1); }
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); }
         .spinner { border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top: 4px solid #fff; width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .camera-box { position: relative; width: 100%; background: #000; overflow: hidden; }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); object-fit: cover; }
+        
+        #kiosk-layout { display: none; background-size: cover; background-position: center; background-repeat: no-repeat; }
+        #kiosk-layout.active { display: flex; flex-direction: column; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; z-index: 100; background-color: #f0f8ff; }
+        
+        .feed-item { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-<body class="bg-slate-100 text-gray-800 h-screen overflow-hidden flex flex-col">
+<body class="bg-slate-50 text-gray-800 h-screen flex flex-col">
 
     <!-- 1. หน้าจอ Login -->
     <div id="auth-view" class="fixed inset-0 bg-slate-900 flex items-center justify-center z-50">
         <div class="bg-white p-10 rounded-xl shadow-2xl w-full max-w-md">
             <div class="text-center mb-8">
                 <div class="bg-blue-600 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl shadow-lg">
-                    <i class="fa-solid fa-graduation-cap"></i>
+                    <i class="fa-solid fa-users-viewfinder"></i>
                 </div>
-                <h2 class="text-2xl font-bold text-gray-800">ระบบเช็คชื่ออัจฉริยะ</h2>
-                <p class="text-gray-500 mt-1">เข้าสู่ระบบสำหรับเจ้าหน้าที่</p>
+                <h2 class="text-2xl font-bold text-gray-800">ระบบสแกนใบหน้า KIOSK</h2>
+                <p class="text-gray-500 mt-1">ลงชื่อเข้าใช้ระบบจัดการ</p>
             </div>
             <form id="login-form" class="space-y-5">
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">อีเมลผู้ดูแลระบบ</label>
-                    <input type="email" id="login-email" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="admin@school.com">
+                    <label class="block text-sm font-semibold mb-1">อีเมลแอดมิน</label>
+                    <input type="email" id="login-email" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">รหัสผ่าน</label>
-                    <input type="password" id="login-pass" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••••">
+                    <label class="block text-sm font-semibold mb-1">รหัสผ่าน</label>
+                    <input type="password" id="login-pass" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                 </div>
                 <button type="submit" id="login-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-lg font-bold shadow-md transition">เข้าสู่ระบบ</button>
                 <p id="login-msg" class="text-sm mt-3 text-center text-red-500 font-medium"></p>
@@ -56,74 +64,142 @@
     <div id="app-view" class="hidden h-full flex w-full">
         <!-- Sidebar -->
         <aside class="w-64 bg-slate-800 text-white flex flex-col shadow-xl z-10 shrink-0">
-            <div class="p-6 border-b border-slate-700 flex items-center gap-3">
-                <i class="fa-solid fa-id-card-clip text-2xl text-blue-400"></i>
-                <span class="text-lg font-bold">FaceScan PRO</span>
+            <div class="p-6 border-b border-slate-700 flex flex-col gap-2">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-bolt text-2xl text-yellow-400"></i>
+                    <span class="text-lg font-bold tracking-wider">KIOSK MULTI</span>
+                </div>
+                <span class="text-xs text-slate-400 font-mono" id="sidebar-school-name">โรงเรียน...</span>
             </div>
             <nav class="p-4 space-y-2 flex-grow">
                 <button onclick="navTo('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left hover:bg-slate-700 transition bg-blue-600">
-                    <i class="fa-solid fa-chart-line w-5"></i> สรุปรายงาน
+                    <i class="fa-solid fa-chart-line w-5"></i> รายงานการเข้าเรียน
                 </button>
                 <button onclick="navTo('enroll')" id="nav-enroll" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left hover:bg-slate-700 transition">
-                    <i class="fa-solid fa-user-plus w-5"></i> ลงทะเบียนฐานข้อมูล
+                    <i class="fa-solid fa-user-plus w-5"></i> ทะเบียนนักเรียน
                 </button>
-                <button onclick="navTo('scanner')" id="nav-scanner" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left hover:bg-slate-700 transition">
-                    <i class="fa-solid fa-expand w-5"></i> จุดตรวจ (Scanner)
+                <button onclick="navTo('scanner-setup')" id="nav-scanner-setup" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left hover:bg-slate-700 transition">
+                    <i class="fa-solid fa-desktop w-5"></i> ตั้งค่าจุดสแกน Kiosk
+                </button>
+                <button onclick="navTo('settings')" id="nav-settings" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left hover:bg-slate-700 transition">
+                    <i class="fa-solid fa-gear w-5"></i> ตั้งค่าระบบ / ธีม
                 </button>
             </nav>
             <div class="p-4 border-t border-slate-700">
-                <button id="logout-btn" class="w-full bg-red-600 hover:bg-red-700 text-white p-2 rounded-lg text-sm font-semibold transition">ออกจากระบบ</button>
+                <button id="logout-btn" class="w-full bg-slate-700 hover:bg-red-600 text-white p-2 rounded-lg text-sm font-semibold transition">ออกจากระบบ</button>
             </div>
         </aside>
 
         <!-- Main Content -->
-        <main class="flex-1 flex flex-col h-full overflow-y-auto">
+        <main class="flex-1 flex flex-col h-full overflow-y-auto bg-slate-50 relative">
             <div id="status-bar" class="bg-blue-900 text-white p-2 text-center text-sm shadow-md sticky top-0 z-20 flex justify-center items-center gap-2">
-                <div class="spinner"></div><span id="status-text">กำลังซิงค์ข้อมูล...</span>
+                <div class="spinner"></div><span id="status-text">กำลังโหลดโมเดล AI (Multi-Face) และซิงค์ข้อมูล...</span>
             </div>
 
             <div class="p-8 w-full max-w-7xl mx-auto">
                 
-                <!-- A. หน้า Dashboard -->
+                <!-- Section: Dashboard -->
                 <section id="section-dashboard" class="section-view active">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold text-slate-800">รายงานการเข้าเรียน</h2>
                         <div class="flex gap-2">
-                            <button id="force-sync-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 font-medium shadow-sm" title="ล้าง Cache และดึงข้อมูลใหม่">
+                            <button id="force-sync-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium shadow-sm">
                                 <i class="fa-solid fa-cloud-arrow-down"></i> ซิงค์ฐานข้อมูล
                             </button>
-                            <button id="refresh-dashboard" class="bg-white border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center gap-2 font-medium shadow-sm">
-                                <i class="fa-solid fa-rotate"></i> รีเฟรชตาราง
-                            </button>
-                            <button id="export-excel" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2 font-bold shadow-sm">
-                                <i class="fa-solid fa-file-excel"></i> Export Excel
+                            <button id="refresh-dashboard" class="bg-white border px-4 py-2 rounded-lg hover:bg-gray-50 font-medium shadow-sm">
+                                <i class="fa-solid fa-rotate"></i> อัปเดตตาราง
                             </button>
                         </div>
                     </div>
                     
-                    <!-- ตารางข้อมูล -->
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+                    <div class="bg-white p-4 rounded-xl shadow-sm border mb-6 flex flex-wrap gap-4 items-end">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">เลือกช่วงเวลา (Export Excel)</label>
+                            <select id="export-filter" class="p-2 border rounded-lg bg-gray-50 outline-none focus:ring-2 focus:ring-green-500">
+                                <option value="today">เฉพาะวันนี้ (Today)</option>
+                                <option value="this_month">เดือนนี้ (This Month)</option>
+                                <option value="all">ทั้งหมดที่มีในระบบ (All Data)</option>
+                            </select>
+                        </div>
+                        <button id="export-excel" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 font-bold shadow-md">
+                            <i class="fa-solid fa-file-excel mr-2"></i> ดาวน์โหลด Excel
+                        </button>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border overflow-x-auto">
                         <table class="w-full text-left whitespace-nowrap" id="report-table">
                             <thead>
-                                <tr class="bg-slate-50 text-slate-600 border-b text-sm">
+                                <tr class="bg-slate-100 text-slate-600 border-b text-sm">
                                     <th class="p-4">เวลาสแกน</th>
                                     <th class="p-4">สถานะ</th>
                                     <th class="p-4">รหัสนักเรียน</th>
                                     <th class="p-4">ชื่อ - นามสกุล</th>
-                                    <th class="p-4">ระดับชั้น/ห้อง/สาขา</th>
-                                    <th class="p-4">วิชา/กิจกรรม</th>
-                                    <th class="p-4">ช่องทาง</th>
+                                    <th class="p-4">ระดับชั้น</th>
+                                    <th class="p-4">จุดสแกน / ประตู</th>
                                 </tr>
                             </thead>
                             <tbody id="attendance-table-body" class="text-sm text-slate-700">
-                                <tr><td colspan="7" class="text-center p-8 text-gray-500">กำลังโหลด...</td></tr>
+                                <tr><td colspan="6" class="text-center p-8 text-gray-500">กำลังโหลด...</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </section>
 
-                <!-- B. หน้าลงทะเบียน -->
+                <!-- Section: Kiosk Setup -->
+                <section id="section-scanner-setup" class="section-view">
+                    <div class="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-lg border text-center">
+                        <i class="fa-solid fa-desktop text-6xl text-blue-500 mb-4"></i>
+                        <h2 class="text-2xl font-bold text-slate-800 mb-2">ตั้งค่าจุดตรวจสแกน (Kiosk Mode)</h2>
+                        <p class="text-gray-500 mb-6">กรุณาตั้งค่าชื่อจุดสแกนและเวลาสายก่อนเข้าสู่โหมดเต็มหน้าจอ</p>
+                        
+                        <div class="space-y-5 text-left mb-8">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">ชื่อจุดสแกน (เช่น ประตูทางเข้า 1)</label>
+                                <input type="text" id="setup-kiosk-name" value="ประตูทางเข้า 1" class="w-full p-3 border rounded-lg bg-gray-50 text-lg font-semibold focus:ring-2 focus:ring-blue-500 outline-none text-blue-700">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-1">เวลาเริ่มรับข้อมูล</label>
+                                    <input type="time" id="setup-time-start" value="06:00" class="w-full p-3 border rounded-lg bg-gray-50 text-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-1">เวลาสาย (สแกนหลังเวลานี้ = สาย)</label>
+                                    <input type="time" id="setup-time-late" value="08:00" class="w-full p-3 border rounded-lg bg-red-50 text-lg font-bold text-red-600 focus:ring-2 focus:ring-red-500">
+                                </div>
+                            </div>
+                        </div>
+
+                        <button id="open-kiosk-btn" class="w-full bg-slate-900 text-white p-4 rounded-xl font-bold text-xl shadow-xl hover:bg-blue-600 transition flex justify-center items-center gap-3">
+                            <i class="fa-solid fa-users"></i> เริ่มต้นโหมด KIOSK (รองรับเดินผ่านหลายคน)
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Section: Settings -->
+                <section id="section-settings" class="section-view">
+                    <div class="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-sm border">
+                        <h2 class="text-2xl font-bold text-slate-800 mb-6 border-b pb-4">ตั้งค่าระบบ / ธีมหน้าจอ Kiosk</h2>
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">ชื่อโรงเรียน / องค์กร</label>
+                                <input type="text" id="setting-school-name" placeholder="โรงเรียนอุทยานศึกษากระบี่" class="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">URL รูปภาพโลโก้โรงเรียน (แสดงมุมซ้ายบน Kiosk)</label>
+                                <input type="text" id="setting-logo-url" placeholder="https://example.com/logo.png" class="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">URL รูปภาพพื้นหลัง (Background หน้า Kiosk)</label>
+                                <input type="text" id="setting-bg-url" placeholder="https://example.com/bg.jpg" class="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2">
+                            </div>
+                            <button id="save-settings-btn" class="bg-blue-600 text-white px-8 py-3 rounded-lg font-bold shadow hover:bg-blue-700">บันทึกการตั้งค่า</button>
+                            <span id="setting-msg" class="ml-4 font-bold"></span>
+                        </div>
+                    </div>
+                </section>
+                
                 <section id="section-enroll" class="section-view">
+                    <!-- ทะเบียนนักเรียน: ใช้การกรอกฟอร์มพร้อมเปิดกล้องถ่ายเพื่อความแม่นยำ -->
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         <div class="bg-white p-6 rounded-xl shadow-sm border">
                             <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">ข้อมูลพื้นฐานผู้เรียน</h3>
@@ -134,17 +210,13 @@
                                         <input type="text" id="en-id" required class="w-full p-2 border rounded-lg bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500">
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-semibold mb-1">ระดับชั้น / ห้อง / คณะ</label>
-                                        <input type="text" id="en-class" required placeholder="ม.5/1 หรือ วิศวกรรมศาสตร์" class="w-full p-2 border rounded-lg bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500">
+                                        <label class="block text-sm font-semibold mb-1">ระดับชั้น / ห้อง</label>
+                                        <input type="text" id="en-class" required placeholder="ม.5/1" class="w-full p-2 border rounded-lg bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500">
                                     </div>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-semibold mb-1">ชื่อ - นามสกุล</label>
                                     <input type="text" id="en-name" required class="w-full p-2 border rounded-lg bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold mb-1">ชื่อรายวิชา / กิจกรรม (Default)</label>
-                                    <input type="text" id="en-course" required value="โฮมรูมตอนเช้า" class="w-full p-2 border rounded-lg bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500">
                                 </div>
                                 <div class="pt-4 mt-4 border-t space-y-2">
                                     <button type="button" id="start-enroll-btn" class="w-full bg-slate-800 text-white p-3 rounded-lg font-bold flex justify-center gap-2 hover:bg-slate-900 transition">
@@ -167,36 +239,81 @@
                     </div>
                 </section>
 
-                <!-- C. หน้าสแกน -->
-                <section id="section-scanner" class="section-view text-center">
-                    <h2 class="text-2xl font-bold mb-4">จุดตรวจสแกนใบหน้า Real-time</h2>
-                    <div class="bg-white p-4 rounded-xl shadow inline-block border">
-                        <div class="mb-4 text-left">
-                            <label class="block text-sm font-semibold text-gray-700">รายวิชา/กิจกรรมที่กำลังสแกน:</label>
-                            <input type="text" id="scan-subject" value="โฮมรูมตอนเช้า" class="w-full p-2 border rounded focus:ring-2 outline-none font-bold text-blue-700">
-                        </div>
-                        <div class="camera-box border-4 border-slate-900 bg-black min-w-[320px] sm:min-w-[640px] aspect-video flex items-center justify-center">
-                            <video id="scan-vid" autoplay muted playsinline class="hidden"></video>
-                            <canvas id="scan-can" class="hidden"></canvas>
-                        </div>
-                        <div class="mt-4 flex gap-2 justify-center">
-                            <button id="start-scan-btn" class="bg-green-600 text-white px-6 py-2 rounded-lg font-bold shadow hover:bg-green-700">เริ่มสแกน</button>
-                            <button id="stop-scan-btn" class="bg-red-600 text-white px-6 py-2 rounded-lg font-bold shadow hover:bg-red-700 hidden">หยุดสแกน</button>
-                        </div>
-                        <div id="scan-result" class="mt-4 p-3 rounded bg-gray-50 border h-16 flex items-center justify-center font-bold text-xl text-gray-400">รอรับภาพ...</div>
-                    </div>
-                </section>
-
             </div>
         </main>
     </div>
 
+    <!-- 3. โหมด KIOSK เต็มหน้าจอ -->
+    <div id="kiosk-layout" class="flex flex-col text-slate-800">
+        <!-- Header -->
+        <header class="bg-white/90 backdrop-blur-sm shadow-md py-3 px-6 flex justify-between items-center z-10">
+            <div class="flex items-center gap-4">
+                <img id="kiosk-logo" src="" alt="Logo" class="h-16 w-auto hidden object-contain">
+                <div>
+                    <h1 id="kiosk-school-title" class="text-2xl font-extrabold text-blue-600 drop-shadow-sm">ชื่อโรงเรียน</h1>
+                    <p class="text-lg font-semibold text-pink-500">ระบบบันทึกเวลาเรียนด้วยเทคโนโลยีจดจำใบหน้าอัจฉริยะ (Multi-Face)</p>
+                </div>
+            </div>
+            <div class="text-right">
+                <div id="kiosk-gate-name" class="text-2xl font-bold text-slate-800 bg-gray-100 px-4 py-1 rounded-lg border">ประตู 1</div>
+                <button id="exit-kiosk-btn" class="text-xs text-red-500 underline mt-1 font-bold hover:text-red-700 cursor-pointer border-none bg-transparent">ออกจากโหมดเต็มหน้าจอ</button>
+            </div>
+        </header>
+
+        <!-- พื้นที่หลัก -->
+        <div class="flex-1 flex p-6 gap-6 overflow-hidden">
+            <!-- ซ้าย: กล้อง -->
+            <div class="flex-3 flex flex-col gap-4 w-[75%] h-full">
+                <div class="flex-1 rounded-3xl overflow-hidden border-8 border-slate-900 shadow-2xl relative bg-black flex items-center justify-center">
+                    <video id="kiosk-vid" autoplay muted playsinline class="hidden"></video>
+                    <canvas id="kiosk-can" class="hidden"></canvas>
+                    <div id="kiosk-placeholder" class="text-gray-600 text-xl font-bold flex flex-col items-center">
+                        <i class="fa-solid fa-spinner fa-spin text-4xl mb-4"></i> กำลังเปิดกล้องความเร็วสูง...
+                    </div>
+                </div>
+
+                <!-- สถิติ -->
+                <div class="h-28 bg-white/95 rounded-2xl shadow-lg border grid grid-cols-4 divide-x-2 divide-gray-200 overflow-hidden text-center shrink-0">
+                    <div class="flex flex-col justify-center p-2">
+                        <p class="text-sm font-bold text-gray-500">จำนวนนักเรียนวันนี้</p>
+                        <p class="text-3xl font-extrabold text-slate-800"><span id="stat-total">0</span> <span class="text-lg">คน</span></p>
+                    </div>
+                    <div class="flex flex-col justify-center p-2">
+                        <p class="text-sm font-bold text-green-600">มาปกติ (ทันเวลา)</p>
+                        <p class="text-3xl font-extrabold text-green-600"><span id="stat-ontime">0</span> <span class="text-lg">คน</span></p>
+                    </div>
+                    <div class="flex flex-col justify-center p-2">
+                        <p class="text-sm font-bold text-red-500">มาสาย</p>
+                        <p class="text-3xl font-extrabold text-red-500"><span id="stat-late">0</span> <span class="text-lg">คน</span></p>
+                    </div>
+                    <div class="flex flex-col justify-center p-2 bg-slate-50">
+                        <p class="text-sm font-bold text-slate-600">เวลาปัจจุบัน</p>
+                        <p id="kiosk-clock" class="text-4xl font-extrabold text-slate-800 font-mono tracking-tighter">00:00:00</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ขวา: Feed -->
+            <div class="flex-1 w-[25%] bg-white/90 rounded-3xl shadow-xl border-4 border-pink-200 flex flex-col overflow-hidden">
+                <div class="bg-pink-100 py-4 text-center border-b-2 border-pink-200 shrink-0">
+                    <h3 class="text-2xl font-extrabold text-pink-600">บันทึกล่าสุด</h3>
+                    <p class="text-sm font-bold text-slate-600">รายการตรวจจับ (Real-time)</p>
+                </div>
+                <div id="kiosk-feed" class="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide bg-slate-50">
+                    <div class="text-center text-gray-400 font-bold mt-10">รอการสแกน...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ================= 4. ระบบฐานข้อมูล และ AI ความเร็วสูง (Multi-Face) ================= -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, where, Timestamp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 
-        // 1. Firebase Config
+        // --- Firebase Config ---
         const firebaseConfig = {
             apiKey: "AIzaSyA_sa2vM6b_Tf_D5k4oQD2BAyaNHecU2GQ",
             authDomain: "dimension-a9dca.firebaseapp.com",
@@ -210,41 +327,75 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
+        // --- Global Variables ---
         let faceMatcher = null;
         let activeStream = null;
-        let scanInterval = null;
+        let activeEnrollStream = null;
+        let isDetecting = false; 
+        let clockInterval = null;
         const cooldown = new Map();
         let studentsData = {};
+        
+        let statData = { total: 0, ontime: 0, late: 0 };
+        const scannedToday = new Set(); 
 
-        // 2. Auth Flow
+        // --- Settings Logic ---
+        function loadSettings() {
+            const sn = localStorage.getItem('cfg_school_name') || 'โรงเรียนอุทยานศึกษากระบี่';
+            const logo = localStorage.getItem('cfg_logo_url') || '';
+            const bg = localStorage.getItem('cfg_bg_url') || '';
+
+            document.getElementById('setting-school-name').value = sn;
+            document.getElementById('setting-logo-url').value = logo;
+            document.getElementById('setting-bg-url').value = bg;
+            document.getElementById('sidebar-school-name').innerText = sn;
+            document.getElementById('kiosk-school-title').innerText = sn;
+            
+            const logoEl = document.getElementById('kiosk-logo');
+            if (logo) { logoEl.src = logo; logoEl.classList.remove('hidden'); } else { logoEl.classList.add('hidden'); }
+            
+            const kioskLayout = document.getElementById('kiosk-layout');
+            if (bg) { kioskLayout.style.backgroundImage = `url('${bg}')`; } else { kioskLayout.style.backgroundImage = 'none'; }
+        }
+
+        document.getElementById('save-settings-btn').onclick = () => {
+            localStorage.setItem('cfg_school_name', document.getElementById('setting-school-name').value);
+            localStorage.setItem('cfg_logo_url', document.getElementById('setting-logo-url').value);
+            localStorage.setItem('cfg_bg_url', document.getElementById('setting-bg-url').value);
+            
+            const msg = document.getElementById('setting-msg');
+            msg.innerText = "✅ บันทึกสำเร็จ"; msg.className = "ml-4 font-bold text-green-600";
+            loadSettings();
+            setTimeout(()=> msg.innerText='', 3000);
+        };
+
+        // --- Auth Logic ---
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 document.getElementById('auth-view').classList.add('hidden');
                 document.getElementById('app-view').classList.remove('hidden');
+                loadSettings();
                 initAI();
                 navTo('dashboard');
             } else {
                 document.getElementById('auth-view').classList.remove('hidden');
                 document.getElementById('app-view').classList.add('hidden');
-                stopCam();
+                exitKioskMode();
             }
         });
 
         document.getElementById('login-form').onsubmit = async (e) => {
             e.preventDefault();
-            const btn = document.getElementById('login-btn');
-            btn.disabled = true; btn.innerText = "กำลังเข้าสู่ระบบ...";
-            try {
-                await signInWithEmailAndPassword(auth, document.getElementById('login-email').value, document.getElementById('login-pass').value);
-            } catch (err) {
-                document.getElementById('login-msg').innerText = "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
-            } finally { btn.disabled = false; btn.innerText = "เข้าสู่ระบบ"; }
+            try { await signInWithEmailAndPassword(auth, document.getElementById('login-email').value, document.getElementById('login-pass').value); } 
+            catch (err) { document.getElementById('login-msg').innerText = "อีเมลหรือรหัสผ่านไม่ถูกต้อง"; }
         };
         document.getElementById('logout-btn').onclick = () => signOut(auth);
 
-        // 3. Navigation
         window.navTo = (sec) => {
-            stopCam();
+            if(activeEnrollStream) { activeEnrollStream.getTracks().forEach(t => t.stop()); activeEnrollStream = null; }
+            document.getElementById('en-vid').classList.add('hidden');
+            document.getElementById('en-icon').classList.remove('hidden');
+            
             document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('bg-blue-600'); el.classList.add('hover:bg-slate-700'); });
             document.getElementById('nav-'+sec).classList.add('bg-blue-600');
             document.querySelectorAll('.section-view').forEach(el => el.classList.remove('active'));
@@ -252,7 +403,7 @@
             if(sec === 'dashboard') fetchReports();
         };
 
-        // 4. AI & DB Sync (Optimized with LocalStorage Cache)
+        // --- AI (Multi-Face Tuned) ---
         async function initAI() {
             try {
                 const URI = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
@@ -263,67 +414,43 @@
                 ]);
                 await syncDB();
                 document.getElementById('status-bar').classList.replace('bg-blue-900', 'bg-green-600');
-                document.getElementById('status-text').innerText = "✅ ข้อมูลและ AI พร้อมทำงาน";
+                document.getElementById('status-text').innerText = "✅ แบบจำลอง AI พร้อมทำงาน (Multi-Face Mode)";
                 document.querySelector('.spinner').style.display = 'none';
-                setTimeout(() => { document.getElementById('status-bar').style.display = 'none'; }, 3000);
-            } catch (e) { alert("โหลด AI ล้มเหลว กรุณารีเฟรช"); }
+                setTimeout(() => document.getElementById('status-bar').style.display = 'none', 3000);
+            } catch (e) { alert("โหลด AI ล้มเหลว"); }
         }
 
         async function syncDB() {
             let rawData = [];
             const cachedData = localStorage.getItem('school_students_cache');
-            
-            if (cachedData) {
-                console.log("ใช้ข้อมูลจาก Local Cache (ประหยัด Firebase Reads)");
-                rawData = JSON.parse(cachedData);
-            } else {
-                console.log("ไม่พบ Cache กำลังดึงข้อมูลจาก Firebase...");
+            if (cachedData) { rawData = JSON.parse(cachedData); } 
+            else {
                 const snap = await getDocs(collection(db, "students"));
-                snap.forEach(doc => {
-                    rawData.push(doc.data());
-                });
+                snap.forEach(doc => rawData.push(doc.data()));
                 localStorage.setItem('school_students_cache', JSON.stringify(rawData));
             }
-
             const labels = [];
             studentsData = {};
-            
             rawData.forEach(d => {
                 if(d.descriptor) {
                     labels.push(new faceapi.LabeledFaceDescriptors(d.studentId, [new Float32Array(d.descriptor)]));
                     studentsData[d.studentId] = d;
                 }
             });
-            
-            faceMatcher = labels.length > 0 ? new faceapi.FaceMatcher(labels, 0.5) : null;
+            // ใช้เกณฑ์ความแม่นยำ 0.42 (กันจำผิดเวลาคนอยู่ใกล้กัน)
+            faceMatcher = labels.length > 0 ? new faceapi.FaceMatcher(labels, 0.42) : null;
         }
 
-        // ปุ่มบังคับล้าง Cache และดึงข้อมูลจาก Firebase ใหม่
-        document.getElementById('force-sync-btn').addEventListener('click', async () => {
-            const btn = document.getElementById('force-sync-btn');
-            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> กำลังซิงค์...`;
+        document.getElementById('force-sync-btn').onclick = async () => {
             localStorage.removeItem('school_students_cache');
-            await syncDB();
-            btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-down"></i> ซิงค์ฐานข้อมูล`;
-            alert("อัปเดตฐานข้อมูลนักเรียนจากระบบคลาวด์เรียบร้อยแล้ว");
-        });
+            await syncDB(); alert("ซิงค์ฐานข้อมูลนักเรียนใหม่เรียบร้อยแล้ว");
+        };
 
-        function stopCam() {
-            if(activeStream) activeStream.getTracks().forEach(t => t.stop());
-            if(scanInterval) clearInterval(scanInterval);
-            document.querySelectorAll('video, canvas').forEach(el => el.classList.add('hidden'));
-            document.getElementById('start-scan-btn').classList.remove('hidden');
-            document.getElementById('stop-scan-btn').classList.add('hidden');
-            document.getElementById('en-icon').classList.remove('hidden');
-            document.getElementById('enroll-cam-box').classList.remove('border-green-500');
-        }
-
-        // 5. Enrollment
+        // --- Enrollment (การลงทะเบียน) ---
         document.getElementById('start-enroll-btn').onclick = async () => {
-            stopCam();
-            activeStream = await navigator.mediaDevices.getUserMedia({video: true});
+            activeEnrollStream = await navigator.mediaDevices.getUserMedia({video: true});
             const v = document.getElementById('en-vid');
-            v.srcObject = activeStream;
+            v.srcObject = activeEnrollStream;
             v.classList.remove('hidden');
             document.getElementById('en-icon').classList.add('hidden');
             document.getElementById('enroll-cam-box').classList.add('border-green-500');
@@ -332,28 +459,30 @@
 
         document.getElementById('enroll-form').onsubmit = async (e) => {
             e.preventDefault();
-            if(!activeStream) return alert("เปิดกล้องก่อน");
+            if(!activeEnrollStream) return alert("เปิดกล้องก่อน");
             const btn = document.getElementById('save-enroll-btn');
             btn.disabled = true; btn.innerText = "กำลังประมวลผล...";
             
             try {
                 const det = await faceapi.detectSingleFace(document.getElementById('en-vid'), new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-                if(!det) throw new Error("ไม่พบหน้า");
+                if(!det) throw new Error("ไม่พบใบหน้า กรุณามองกล้องให้ชัดเจน");
                 
                 await addDoc(collection(db, "students"), {
                     studentId: document.getElementById('en-id').value,
                     name: document.getElementById('en-name').value,
                     level: document.getElementById('en-class').value,
-                    course: document.getElementById('en-course').value,
                     descriptor: Array.from(det.descriptor),
                     createdAt: serverTimestamp()
                 });
                 
                 document.getElementById('enroll-msg').innerHTML = `<span class="text-green-600">ลงทะเบียนสำเร็จ!</span>`;
                 e.target.reset(); 
-                stopCam(); 
                 
-                // ล้าง Cache แล้วดึงใหม่เพื่อให้คนใหม่เข้ามาในระบบสแกนทันที
+                if(activeEnrollStream) { activeEnrollStream.getTracks().forEach(t => t.stop()); }
+                document.getElementById('en-vid').classList.add('hidden');
+                document.getElementById('en-icon').classList.remove('hidden');
+                document.getElementById('enroll-cam-box').classList.remove('border-green-500');
+                
                 localStorage.removeItem('school_students_cache');
                 await syncDB();
                 
@@ -362,115 +491,240 @@
             } finally { btn.disabled = false; btn.innerHTML = "2. ถ่ายภาพและบันทึกข้อมูล"; }
         };
 
-        // 6. Scanner (Optimized ลูปประมวลผล + Cooldown)
-        const scanVid = document.getElementById('scan-vid');
-        const scanCan = document.getElementById('scan-can');
+        // --- KIOSK MODE (เดินผ่านหลายคน) ---
+        const kioskVid = document.getElementById('kiosk-vid');
+        const kioskCan = document.getElementById('kiosk-can');
+        const feedContainer = document.getElementById('kiosk-feed');
         
-        document.getElementById('start-scan-btn').onclick = async () => {
-            if(!faceMatcher) return alert("ไม่มีข้อมูล");
-            stopCam();
-            document.getElementById('start-scan-btn').classList.add('hidden');
-            document.getElementById('stop-scan-btn').classList.remove('hidden');
-            
-            activeStream = await navigator.mediaDevices.getUserMedia({video: {width: 480}});
-            scanVid.srcObject = activeStream;
-            scanVid.classList.remove('hidden');
-            scanCan.classList.remove('hidden');
-        };
-        document.getElementById('stop-scan-btn').onclick = stopCam;
+        let KIOSK_GATE = "ประตู 1";
+        let LATE_TIME = "08:00";
 
-        scanVid.onplay = () => {
-            faceapi.matchDimensions(scanCan, scanVid);
+        function updateKioskStats() {
+            document.getElementById('stat-total').innerText = statData.total;
+            document.getElementById('stat-ontime').innerText = statData.ontime;
+            document.getElementById('stat-late').innerText = statData.late;
+        }
+
+        function addFeedItem(student, statusStr, timeStr) {
+            const isLate = statusStr === "มาสาย";
+            const borderCol = isLate ? 'border-red-400' : 'border-green-400';
+            const iconCol = isLate ? 'text-red-500 fa-circle-xmark' : 'text-green-500 fa-circle-check';
+            const timeCol = isLate ? 'text-red-600' : 'text-green-600';
+
+            const div = document.createElement('div');
+            div.className = `feed-item bg-white p-3 rounded-2xl shadow-sm border-l-8 ${borderCol} flex gap-3 items-center`;
+            div.innerHTML = `
+                <div class="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center border shrink-0 relative overflow-hidden">
+                    <i class="fa-solid fa-user text-gray-400 text-2xl"></i>
+                    <i class="fa-solid ${iconCol} absolute -bottom-1 -right-1 bg-white rounded-full text-lg shadow-sm"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-extrabold text-slate-800 text-sm truncate">${student.name}</p>
+                    <p class="text-xs text-gray-500 truncate">${student.level || 'รหัส: '+student.studentId}</p>
+                </div>
+                <div class="shrink-0 text-right">
+                    <p class="font-black text-lg ${timeCol}">${timeStr} น.</p>
+                </div>
+            `;
+            feedContainer.insertBefore(div, feedContainer.firstChild);
+            if(feedContainer.children.length > 20) feedContainer.lastChild.remove();
+        }
+
+        document.getElementById('open-kiosk-btn').onclick = async () => {
+            if(!faceMatcher) return alert("AI ยังไม่พร้อม หรือไม่มีข้อมูลนักเรียน");
             
-            // ประมวลผลทุกๆ 1.5 วินาที เพื่อลดภาระ CPU และกันเบราว์เซอร์ค้าง
-            scanInterval = setInterval(async () => {
-                const dets = await faceapi.detectAllFaces(scanVid, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptors();
-                const resDets = faceapi.resizeResults(dets, scanVid);
+            KIOSK_GATE = document.getElementById('setup-kiosk-name').value;
+            LATE_TIME = document.getElementById('setup-time-late').value;
+            document.getElementById('kiosk-gate-name').innerText = KIOSK_GATE;
+            feedContainer.innerHTML = '';
+            
+            document.getElementById('app-view').classList.add('hidden');
+            document.getElementById('kiosk-layout').classList.add('active');
+            
+            try {
+                // ขอกล้องความละเอียดสูง เพื่อให้คนเดินมา 2-3 คน ใบหน้ายังคมชัดพอ
+                activeStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } }
+                });
+                kioskVid.srcObject = activeStream;
+                kioskVid.classList.remove('hidden');
+                kioskCan.classList.remove('hidden');
+                document.getElementById('kiosk-placeholder').classList.add('hidden');
                 
-                const ctx = scanCan.getContext('2d');
-                ctx.clearRect(0,0,scanCan.width,scanCan.height);
+                clockInterval = setInterval(() => {
+                    const now = new Date();
+                    document.getElementById('kiosk-clock').innerText = now.toLocaleTimeString('th-TH');
+                }, 1000);
+
+            } catch (err) { alert("เปิดกล้องไม่ได้"); exitKioskMode(); }
+        };
+
+        function exitKioskMode() {
+            isDetecting = false;
+            if(activeStream) activeStream.getTracks().forEach(t => t.stop());
+            if(clockInterval) clearInterval(clockInterval);
+            
+            kioskVid.classList.add('hidden');
+            kioskCan.classList.add('hidden');
+            document.getElementById('kiosk-placeholder').classList.remove('hidden');
+            
+            document.getElementById('kiosk-layout').classList.remove('active');
+            document.getElementById('app-view').classList.remove('hidden');
+        }
+        document.getElementById('exit-kiosk-btn').onclick = exitKioskMode;
+
+        // --- ลูปจับใบหน้า (หลายคนในเฟรมเดียว) ---
+        async function processVideoFrame() {
+            if(!isDetecting) return;
+
+            try {
+                // การตั้งค่า inputSize: 512 จะกวาดพื้นที่กว้างขึ้น (จับหลายหน้าได้ดีขึ้น) และ scoreThreshold: 0.4 ให้มันหาหน้าง่ายขึ้น
+                const dets = await faceapi.detectAllFaces(kioskVid, new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.4 }))
+                                          .withFaceLandmarks().withFaceDescriptors();
+                                          
+                const resDets = faceapi.resizeResults(dets, kioskVid);
+                const ctx = kioskCan.getContext('2d');
+                ctx.clearRect(0,0,kioskCan.width,kioskCan.height);
                 
+                // วนลูปเช็คทุกคนที่เจอในเฟรมเดียว
                 for(const d of resDets) {
                     const match = faceMatcher.findBestMatch(d.descriptor);
                     if(match.label !== 'unknown') {
                         const sid = match.label;
                         const student = studentsData[sid];
-                        const now = Date.now();
+                        const now = new Date();
+                        const nowMs = now.getTime();
                         
-                        new faceapi.draw.DrawBox(d.detection.box, {label: student.name, boxColor: '#16a34a'}).draw(scanCan);
+                        // วาดกรอบบนจอ
+                        new faceapi.draw.DrawBox(d.detection.box, {label: student.name, boxColor: '#22c55e'}).draw(kioskCan);
                         
-                        // ระบบ Cooldown 5 นาที (300,000 มิลลิวินาที)
                         const lastScanTime = cooldown.get(sid) || 0;
-                        if(now - lastScanTime > 300000) {
-                            cooldown.set(sid, now);
+                        if(nowMs - lastScanTime > 300000) { // Cooldown 5 นาที
+                            cooldown.set(sid, nowMs);
                             
-                            // เช็คเวลามาสาย (หลัง 08:00 ถือว่าสาย)
-                            const currentHour = new Date().getHours();
-                            const currentMin = new Date().getMinutes();
-                            const status = (currentHour > 8 || (currentHour === 8 && currentMin > 0)) ? "มาสาย" : "มาปกติ";
-                            const subject = document.getElementById('scan-subject').value;
+                            const timeStr = now.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'});
+                            let status = (timeStr > LATE_TIME) ? "มาสาย" : "มาปกติ";
                             
-                            document.getElementById('scan-result').innerHTML = `<span class="text-green-600 font-bold">${student.name} - บันทึกข้อมูลแล้ว!</span>`;
+                            if(!scannedToday.has(sid)) {
+                                scannedToday.add(sid);
+                                statData.total++;
+                                if(status === "มาปกติ") statData.ontime++; else statData.late++;
+                                updateKioskStats();
+                            }
+
+                            // แอดข้อมูลหลายคนขึ้นจอพร้อมกันได้ทันที
+                            addFeedItem(student, status, timeStr);
                             
-                            // ส่งบันทึกลง Firebase (เสีย 1 Write)
                             addDoc(collection(db, "attendance"), {
                                 studentId: sid,
                                 name: student.name,
-                                level: student.level,
-                                course: subject,
+                                level: student.level || '-',
+                                gate: KIOSK_GATE,
                                 status: status,
                                 method: "Face Scan",
                                 timestamp: serverTimestamp()
-                            }).catch(err => console.error("Firebase Error:", err));
-                            
-                        } else {
-                            // ยืนแช่หรือสแกนซ้ำใน 5 นาที -> โชว์ผลเฉยๆ ไม่ส่งเข้าฐานข้อมูล
-                            document.getElementById('scan-result').innerHTML = `<span class="text-gray-500">${student.name} - เช็คชื่อไปแล้ว (กำลังหน่วงเวลา)</span>`;
+                            }).catch(err => console.log("Log error", err));
                         }
                     } else {
-                        new faceapi.draw.DrawBox(d.detection.box, {label: "Unknown", boxColor: '#ef4444'}).draw(scanCan);
+                        // หน้าที่ไม่ตรงกับในฐานข้อมูล
+                        new faceapi.draw.DrawBox(d.detection.box, {label: "ไม่พบข้อมูล", boxColor: '#ef4444'}).draw(kioskCan);
                     }
                 }
-            }, 1500); // <-- ความถี่การสแกน (มิลลิวินาที)
+            } catch (e) {
+                // ป้องกันลูปพังเมื่อลดหน้าต่าง
+            }
+
+            if(isDetecting) {
+                requestAnimationFrame(processVideoFrame);
+            }
+        }
+
+        kioskVid.onplay = () => {
+            faceapi.matchDimensions(kioskCan, kioskVid);
+            isDetecting = true;
+            processVideoFrame(); 
         };
 
-        // 7. Dashboard & Export
+        // --- Reports & Export ---
         async function fetchReports() {
             const tb = document.getElementById('attendance-table-body');
-            tb.innerHTML = '<tr><td colspan="7" class="text-center p-8">กำลังโหลด...</td></tr>';
+            tb.innerHTML = '<tr><td colspan="6" class="text-center p-8">กำลังดึงข้อมูล...</td></tr>';
             try {
-                // ดึง 200 รายการล่าสุด
                 const q = query(collection(db, "attendance"), orderBy("timestamp", "desc"), limit(200));
                 const snap = await getDocs(q);
-                tb.innerHTML = snap.empty ? '<tr><td colspan="7" class="text-center p-8">ไม่มีข้อมูล</td></tr>' : '';
+                tb.innerHTML = snap.empty ? '<tr><td colspan="6" class="text-center p-8">ไม่มีข้อมูล</td></tr>' : '';
                 
                 snap.forEach(doc => {
                     const d = doc.data();
                     const time = d.timestamp ? d.timestamp.toDate().toLocaleString('th-TH') : "-";
-                    const statusColor = d.status === 'มาสาย' ? 'text-amber-600 bg-amber-50' : 'text-green-600 bg-green-50';
+                    const statusColor = d.status === 'มาสาย' ? 'text-red-600 bg-red-50' : 'text-green-600 bg-green-50';
                     
                     tb.innerHTML += `
                         <tr class="border-b hover:bg-gray-50">
                             <td class="p-4">${time}</td>
-                            <td class="p-4"><span class="px-2 py-1 rounded-full text-xs font-bold ${statusColor}">${d.status}</span></td>
+                            <td class="p-4"><span class="px-3 py-1 rounded-full text-xs font-bold border ${statusColor}">${d.status}</span></td>
                             <td class="p-4 font-bold text-gray-700">${d.studentId}</td>
                             <td class="p-4">${d.name}</td>
                             <td class="p-4">${d.level || '-'}</td>
-                            <td class="p-4">${d.course || '-'}</td>
-                            <td class="p-4"><i class="fa-solid fa-camera mr-1 text-gray-400"></i> ${d.method || 'Face Scan'}</td>
+                            <td class="p-4 font-semibold text-blue-600">${d.gate || 'ประตู 1'}</td>
                         </tr>
                     `;
                 });
-            } catch(e) { tb.innerHTML = `<tr><td colspan="7" class="text-center p-8 text-red-500">Error: ${e.message}</td></tr>`; }
+            } catch(e) { tb.innerHTML = `<tr><td colspan="6" class="text-center p-8 text-red-500">Error: ${e.message}</td></tr>`; }
         }
         document.getElementById('refresh-dashboard').onclick = fetchReports;
 
-        // Export to Excel
-        document.getElementById('export-excel').onclick = () => {
-            const table = document.getElementById("report-table");
-            const wb = XLSX.utils.table_to_book(table, {sheet: "รายงานเข้าเรียน"});
-            XLSX.writeFile(wb, "Attendance_Report.xlsx");
+        document.getElementById('export-excel').onclick = async () => {
+            const filter = document.getElementById('export-filter').value;
+            const btn = document.getElementById('export-excel');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> กำลังดึงข้อมูล...';
+            
+            try {
+                let q;
+                const collRef = collection(db, "attendance");
+                
+                if (filter === 'all') {
+                    q = query(collRef, orderBy("timestamp", "desc"));
+                } else {
+                    const now = new Date();
+                    let startDate = new Date();
+                    
+                    if (filter === 'today') {
+                        startDate.setHours(0,0,0,0);
+                    } else if (filter === 'this_month') {
+                        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                    }
+                    
+                    q = query(collRef, where("timestamp", ">=", Timestamp.fromDate(startDate)), orderBy("timestamp", "desc"));
+                }
+
+                const snap = await getDocs(q);
+                if (snap.empty) { alert("ไม่มีข้อมูลในขอบเขตเวลาที่เลือก"); return; }
+
+                const exportData = [
+                    ["วัน-เวลาที่สแกน", "รหัสนักเรียน", "ชื่อ-นามสกุล", "ระดับชั้น", "สถานะ", "จุดสแกน (ประตู)", "วิธีสแกน"]
+                ];
+
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    const dateStr = d.timestamp ? d.timestamp.toDate().toLocaleString('th-TH') : "";
+                    exportData.push([
+                        dateStr, d.studentId, d.name, d.level || "-", d.status, d.gate || "-", d.method || "-"
+                    ]);
+                });
+
+                const ws = XLSX.utils.aoa_to_sheet(exportData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+                XLSX.writeFile(wb, `รายงานเช็คชื่อ_${filter}_${new Date().getTime()}.xlsx`);
+
+            } catch (err) {
+                alert("โหลดเอกสารผิดพลาด: " + err.message);
+            } finally {
+                btn.innerHTML = '<i class="fa-solid fa-file-excel mr-2"></i> ดาวน์โหลด Excel';
+            }
         };
+
     </script>
 </body>
 </html>
