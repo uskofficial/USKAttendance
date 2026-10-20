@@ -89,8 +89,11 @@
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold text-slate-800">รายงานการเข้าเรียน</h2>
                         <div class="flex gap-2">
+                            <button id="force-sync-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 font-medium shadow-sm" title="ล้าง Cache และดึงข้อมูลใหม่">
+                                <i class="fa-solid fa-cloud-arrow-down"></i> ซิงค์ฐานข้อมูล
+                            </button>
                             <button id="refresh-dashboard" class="bg-white border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center gap-2 font-medium shadow-sm">
-                                <i class="fa-solid fa-rotate"></i> รีเฟรช
+                                <i class="fa-solid fa-rotate"></i> รีเฟรชตาราง
                             </button>
                             <button id="export-excel" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2 font-bold shadow-sm">
                                 <i class="fa-solid fa-file-excel"></i> Export Excel
@@ -211,7 +214,7 @@
         let activeStream = null;
         let scanInterval = null;
         const cooldown = new Map();
-        let studentsData = {}; // เก็บข้อมูลพื้นฐานนักเรียนเพื่อใช้ตอนสแกน
+        let studentsData = {};
 
         // 2. Auth Flow
         onAuthStateChanged(auth, (user) => {
@@ -249,12 +252,12 @@
             if(sec === 'dashboard') fetchReports();
         };
 
-        // 4. AI & DB Sync (Optimized)
+        // 4. AI & DB Sync (Optimized with LocalStorage Cache)
         async function initAI() {
             try {
                 const URI = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
                 await Promise.all([
-                    faceapi.nets.tinyFaceDetector.loadFromUri(URI), // ใช้ Tiny เพื่อให้เบา ไม่ค้าง
+                    faceapi.nets.tinyFaceDetector.loadFromUri(URI),
                     faceapi.nets.faceLandmark68Net.loadFromUri(URI),
                     faceapi.nets.faceRecognitionNet.loadFromUri(URI)
                 ]);
@@ -267,18 +270,43 @@
         }
 
         async function syncDB() {
-            const snap = await getDocs(collection(db, "students"));
+            let rawData = [];
+            const cachedData = localStorage.getItem('school_students_cache');
+            
+            if (cachedData) {
+                console.log("ใช้ข้อมูลจาก Local Cache (ประหยัด Firebase Reads)");
+                rawData = JSON.parse(cachedData);
+            } else {
+                console.log("ไม่พบ Cache กำลังดึงข้อมูลจาก Firebase...");
+                const snap = await getDocs(collection(db, "students"));
+                snap.forEach(doc => {
+                    rawData.push(doc.data());
+                });
+                localStorage.setItem('school_students_cache', JSON.stringify(rawData));
+            }
+
             const labels = [];
             studentsData = {};
-            snap.forEach(doc => {
-                const d = doc.data();
+            
+            rawData.forEach(d => {
                 if(d.descriptor) {
                     labels.push(new faceapi.LabeledFaceDescriptors(d.studentId, [new Float32Array(d.descriptor)]));
                     studentsData[d.studentId] = d;
                 }
             });
+            
             faceMatcher = labels.length > 0 ? new faceapi.FaceMatcher(labels, 0.5) : null;
         }
+
+        // ปุ่มบังคับล้าง Cache และดึงข้อมูลจาก Firebase ใหม่
+        document.getElementById('force-sync-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('force-sync-btn');
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> กำลังซิงค์...`;
+            localStorage.removeItem('school_students_cache');
+            await syncDB();
+            btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-down"></i> ซิงค์ฐานข้อมูล`;
+            alert("อัปเดตฐานข้อมูลนักเรียนจากระบบคลาวด์เรียบร้อยแล้ว");
+        });
 
         function stopCam() {
             if(activeStream) activeStream.getTracks().forEach(t => t.stop());
@@ -322,13 +350,19 @@
                 });
                 
                 document.getElementById('enroll-msg').innerHTML = `<span class="text-green-600">ลงทะเบียนสำเร็จ!</span>`;
-                e.target.reset(); stopCam(); await syncDB();
+                e.target.reset(); 
+                stopCam(); 
+                
+                // ล้าง Cache แล้วดึงใหม่เพื่อให้คนใหม่เข้ามาในระบบสแกนทันที
+                localStorage.removeItem('school_students_cache');
+                await syncDB();
+                
             } catch (err) {
                 document.getElementById('enroll-msg').innerHTML = `<span class="text-red-600">${err.message}</span>`;
             } finally { btn.disabled = false; btn.innerHTML = "2. ถ่ายภาพและบันทึกข้อมูล"; }
         };
 
-        // 6. Scanner (Optimized ลูปประมวลผล)
+        // 6. Scanner (Optimized ลูปประมวลผล + Cooldown)
         const scanVid = document.getElementById('scan-vid');
         const scanCan = document.getElementById('scan-can');
         
@@ -338,7 +372,6 @@
             document.getElementById('start-scan-btn').classList.add('hidden');
             document.getElementById('stop-scan-btn').classList.remove('hidden');
             
-            // ลดความละเอียดกล้องลง เพื่อไม่ให้ Browser ค้าง
             activeStream = await navigator.mediaDevices.getUserMedia({video: {width: 480}});
             scanVid.srcObject = activeStream;
             scanVid.classList.remove('hidden');
@@ -349,7 +382,7 @@
         scanVid.onplay = () => {
             faceapi.matchDimensions(scanCan, scanVid);
             
-            // ใช้ 1000ms (1 วินาที) แทน 400ms เพื่อป้องกันการค้าง
+            // ประมวลผลทุกๆ 1.5 วินาที เพื่อลดภาระ CPU และกันเบราว์เซอร์ค้าง
             scanInterval = setInterval(async () => {
                 const dets = await faceapi.detectAllFaces(scanVid, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptors();
                 const resDets = faceapi.resizeResults(dets, scanVid);
@@ -366,17 +399,20 @@
                         
                         new faceapi.draw.DrawBox(d.detection.box, {label: student.name, boxColor: '#16a34a'}).draw(scanCan);
                         
-                        if(now - (cooldown.get(sid) || 0) > 60000) {
+                        // ระบบ Cooldown 5 นาที (300,000 มิลลิวินาที)
+                        const lastScanTime = cooldown.get(sid) || 0;
+                        if(now - lastScanTime > 300000) {
                             cooldown.set(sid, now);
                             
-                            // โลจิกเช็คมาสาย (หลัง 08:00 ถือว่าสาย)
+                            // เช็คเวลามาสาย (หลัง 08:00 ถือว่าสาย)
                             const currentHour = new Date().getHours();
                             const currentMin = new Date().getMinutes();
                             const status = (currentHour > 8 || (currentHour === 8 && currentMin > 0)) ? "มาสาย" : "มาปกติ";
                             const subject = document.getElementById('scan-subject').value;
                             
-                            document.getElementById('scan-result').innerHTML = `<span class="text-green-600 font-bold">${student.name} - ${status}</span>`;
+                            document.getElementById('scan-result').innerHTML = `<span class="text-green-600 font-bold">${student.name} - บันทึกข้อมูลแล้ว!</span>`;
                             
+                            // ส่งบันทึกลง Firebase (เสีย 1 Write)
                             addDoc(collection(db, "attendance"), {
                                 studentId: sid,
                                 name: student.name,
@@ -385,13 +421,17 @@
                                 status: status,
                                 method: "Face Scan",
                                 timestamp: serverTimestamp()
-                            });
+                            }).catch(err => console.error("Firebase Error:", err));
+                            
+                        } else {
+                            // ยืนแช่หรือสแกนซ้ำใน 5 นาที -> โชว์ผลเฉยๆ ไม่ส่งเข้าฐานข้อมูล
+                            document.getElementById('scan-result').innerHTML = `<span class="text-gray-500">${student.name} - เช็คชื่อไปแล้ว (กำลังหน่วงเวลา)</span>`;
                         }
                     } else {
                         new faceapi.draw.DrawBox(d.detection.box, {label: "Unknown", boxColor: '#ef4444'}).draw(scanCan);
                     }
                 }
-            }, 1000); 
+            }, 1500); // <-- ความถี่การสแกน (มิลลิวินาที)
         };
 
         // 7. Dashboard & Export
@@ -399,6 +439,7 @@
             const tb = document.getElementById('attendance-table-body');
             tb.innerHTML = '<tr><td colspan="7" class="text-center p-8">กำลังโหลด...</td></tr>';
             try {
+                // ดึง 200 รายการล่าสุด
                 const q = query(collection(db, "attendance"), orderBy("timestamp", "desc"), limit(200));
                 const snap = await getDocs(q);
                 tb.innerHTML = snap.empty ? '<tr><td colspan="7" class="text-center p-8">ไม่มีข้อมูล</td></tr>' : '';
@@ -424,7 +465,7 @@
         }
         document.getElementById('refresh-dashboard').onclick = fetchReports;
 
-        // Export to Excel using SheetJS
+        // Export to Excel
         document.getElementById('export-excel').onclick = () => {
             const table = document.getElementById("report-table");
             const wb = XLSX.utils.table_to_book(table, {sheet: "รายงานเข้าเรียน"});
