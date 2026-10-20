@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facial Recognition Attendance</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Face API.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
+
+    <style>
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        #video-container { position: relative; width: 100%; max-width: 640px; margin: 0 auto; }
+        #video-element { width: 100%; border-radius: 0.5rem; background-color: #000; }
+        #canvas-element { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex flex-col">
+
+    <!-- === หน้าจอล็อกอิน (แสดงตอนเริ่มต้น) === -->
+    <div id="login-container" class="flex-grow flex items-center justify-center">
+        <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+            <div class="text-center mb-6">
+                <h2 class="text-3xl font-bold text-blue-600">School AI Login</h2>
+                <p class="text-gray-500 mt-2">ลงชื่อเข้าใช้สำหรับผู้ดูแลระบบ</p>
+            </div>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium">อีเมล (Email)</label>
+                    <input type="email" id="login-email" required class="w-full mt-1 p-2 border rounded focus:ring focus:ring-blue-200">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">รหัสผ่าน (Password)</label>
+                    <input type="password" id="login-pass" required class="w-full mt-1 p-2 border rounded focus:ring focus:ring-blue-200">
+                </div>
+                <button type="submit" id="login-btn" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 font-bold">เข้าสู่ระบบ</button>
+                <p id="login-msg" class="text-sm mt-2 text-center text-red-500"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- === ระบบหลัก (ซ่อนไว้ก่อนจนกว่าจะล็อกอิน) === -->
+    <div id="main-app" class="hidden flex-grow flex flex-col">
+        <!-- Navbar -->
+        <nav class="bg-blue-600 text-white p-4 shadow-md">
+            <div class="container mx-auto flex justify-between items-center">
+                <h1 class="text-xl font-bold">School Attendance AI</h1>
+                <div class="flex items-center space-x-4">
+                    <button onclick="switchTab('enroll')" class="hover:text-blue-200">ลงทะเบียน</button>
+                    <button onclick="switchTab('scanner')" class="hover:text-blue-200">สแกนหน้า</button>
+                    <button onclick="switchTab('dashboard')" class="hover:text-blue-200">รายงาน</button>
+                    <div class="border-l border-blue-400 h-6 mx-2"></div>
+                    <button id="logout-btn" class="bg-red-500 hover:bg-red-600 px-3 py-1 rounded text-sm font-bold shadow">ออกจากระบบ</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Status Bar (AI Model Loading) -->
+        <div id="status-bar" class="bg-yellow-100 text-yellow-800 p-2 text-center text-sm flex items-center justify-center gap-2">
+            <div class="loader inline-block w-4 h-4 border-2"></div>
+            <span id="status-text">กำลังโหลดโมเดล AI... (อาจใช้เวลา 10-20 วินาทีในครั้งแรก)</span>
+        </div>
+
+        <!-- Main Content Tabs -->
+        <div class="container mx-auto p-4 mt-4 flex-grow">
+            <!-- 1. หน้าลงทะเบียน -->
+            <div id="enroll" class="tab-content active max-w-md mx-auto bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-bold mb-4 text-blue-600">ลงทะเบียนนักเรียน</h2>
+                <form id="enroll-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium">รหัสนักเรียน</label>
+                        <input type="text" id="enroll-id" required class="w-full mt-1 p-2 border rounded focus:ring focus:ring-blue-200">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">ชื่อ-นามสกุล</label>
+                        <input type="text" id="enroll-name" required class="w-full mt-1 p-2 border rounded focus:ring focus:ring-blue-200">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">อัปโหลดรูปหน้าตรง (ชัดเจน)</label>
+                        <input type="file" id="enroll-image" accept="image/*" required class="w-full mt-1 p-2 border rounded">
+                    </div>
+                    <img id="image-preview" class="w-full rounded hidden mt-2">
+                    <button type="submit" id="enroll-btn" disabled class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 disabled:opacity-50">บันทึกข้อมูล</button>
+                    <p id="enroll-msg" class="text-sm mt-2 text-center"></p>
+                </form>
+            </div>
+
+            <!-- 2. หน้าสแกน -->
+            <div id="scanner" class="tab-content text-center">
+                <h2 class="text-2xl font-bold mb-4 text-blue-600">ระบบสแกนใบหน้าเข้าเรียน</h2>
+                <div id="video-container" class="shadow-lg border-4 border-gray-200 rounded-lg overflow-hidden relative">
+                    <video id="video-element" autoplay muted playsinline></video>
+                    <canvas id="canvas-element"></canvas>
+                </div>
+                <div class="mt-4 space-x-2">
+                    <button id="start-camera" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 font-medium">เปิดกล้อง</button>
+                    <button id="stop-camera" class="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700 font-medium hidden">ปิดกล้อง</button>
+                </div>
+                <p id="scan-result" class="mt-4 text-xl font-bold min-h-[30px]"></p>
+            </div>
+
+            <!-- 3. หน้ารายงาน -->
+            <div id="dashboard" class="tab-content bg-white p-6 rounded-lg shadow-md max-w-4xl mx-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-blue-600">ประวัติการเข้าเรียน</h2>
+                    <button id="refresh-dashboard" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 text-sm">รีเฟรชข้อมูล</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-100 border-b-2 border-gray-200">
+                                <th class="p-3">เวลา</th>
+                                <th class="p-3">รหัสนักเรียน</th>
+                                <th class="p-3">ชื่อ-นามสกุล</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendance-table-body">
+                            <tr><td colspan="3" class="text-center p-4 text-gray-500">ไม่มีข้อมูล</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK & Application Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+
+        // === Firebase Config ของคุณ ===
+        const firebaseConfig = {
+            apiKey: "AIzaSyA_sa2vM6b_Tf_D5k4oQD2BAyaNHecU2GQ",
+            authDomain: "dimension-a9dca.firebaseapp.com",
+            projectId: "dimension-a9dca",
+            storageBucket: "dimension-a9dca.firebasestorage.app",
+            messagingSenderId: "92180281499",
+            appId: "1:92180281499:web:d568811e8c336b14162e3e",
+            measurementId: "G-QW4L9GG1VZ"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Global Variables
+        let isModelLoaded = false;
+        let faceMatcher = null;
+        let scanInterval = null;
+        let stream = null;
+        const cooldownMap = new Map();
+        const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
+
+        // ==========================================
+        // ส่วนที่ 1: ระบบ Authentication (ล็อกอิน)
+        // ==========================================
+        
+        // เช็คสถานะล็อกอิน (ทำงานอัตโนมัติเมื่อเปิดเว็บหรือรีเฟรช)
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // ล็อกอินแล้ว -> ซ่อนหน้าล็อกอิน, โชว์แอพหลัก
+                document.getElementById('login-container').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+                
+                // เริ่มโหลดโมเดล AI ทันทีที่ล็อกอินผ่าน
+                if (!isModelLoaded) loadModels();
+            } else {
+                // ยังไม่ล็อกอิน หรือออกจากระบบแล้ว -> โชว์หน้าล็อกอิน, ซ่อนแอพหลัก
+                document.getElementById('login-container').classList.remove('hidden');
+                document.getElementById('main-app').classList.add('hidden');
+                
+                // ปิดกล้องถ้าเปิดทิ้งไว้
+                if (stream) document.getElementById('stop-camera').click();
+            }
+        });
+
+        // กดปุ่มเข้าสู่ระบบ
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-pass').value;
+            const btn = document.getElementById('login-btn');
+            const msg = document.getElementById('login-msg');
+
+            btn.disabled = true;
+            btn.innerText = "กำลังเข้าสู่ระบบ...";
+            msg.innerText = "";
+
+            try {
+                await signInWithEmailAndPassword(auth, email, pass);
+                document.getElementById('login-form').reset();
+            } catch (error) {
+                console.error(error);
+                msg.innerText = "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "เข้าสู่ระบบ";
+            }
+        });
+
+        // กดปุ่มออกจากระบบ
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+            } catch (error) {
+                console.error("Logout Error:", error);
+            }
+        });
+
+        // ==========================================
+        // ส่วนที่ 2: ระบบ Face Recognition & Database
+        // ==========================================
+
+        async function loadModels() {
+            try {
+                await Promise.all([
+                    faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+                ]);
+                isModelLoaded = true;
+                
+                const statusDiv = document.getElementById('status-bar');
+                statusDiv.classList.replace('bg-yellow-100', 'bg-green-100');
+                statusDiv.classList.replace('text-yellow-800', 'text-green-800');
+                document.getElementById('status-text').innerText = "✅ โหลดโมเดล AI พร้อมใช้งานแล้ว";
+                document.querySelector('.loader').style.display = 'none';
+                document.getElementById('enroll-btn').disabled = false;
+
+                await buildFaceMatcher();
+                setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
+            } catch (err) {
+                console.error(err);
+                document.getElementById('status-text').innerText = "❌ เกิดข้อผิดพลาดในการโหลดโมเดล AI";
+            }
+        }
+
+        async function buildFaceMatcher() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "students"));
+                const labeledDescriptors = [];
+                
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    if(data.descriptor && data.descriptor.length === 128) {
+                        const float32Array = new Float32Array(data.descriptor);
+                        labeledDescriptors.push(
+                            new faceapi.LabeledFaceDescriptors(`${data.studentId}|${data.name}`, [float32Array])
+                        );
+                    }
+                });
+
+                if(labeledDescriptors.length > 0) {
+                    faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.45);
+                } else {
+                    faceMatcher = null;
+                }
+            } catch (err) {
+                console.error("Error building face matcher:", err);
+            }
+        }
+
+        // ระบบลงทะเบียน
+        const enrollForm = document.getElementById('enroll-form');
+        const enrollImage = document.getElementById('enroll-image');
+        const imagePreview = document.getElementById('image-preview');
+
+        enrollImage.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                imagePreview.src = URL.createObjectURL(file);
+                imagePreview.classList.remove('hidden');
+            }
+        });
+
+        enrollForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('enroll-btn');
+            const msg = document.getElementById('enroll-msg');
+            const studentId = document.getElementById('enroll-id').value.trim();
+            const name = document.getElementById('enroll-name').value.trim();
+
+            if (!isModelLoaded) return;
+            
+            btn.disabled = true;
+            btn.innerText = "กำลังสกัดเวกเตอร์ใบหน้า...";
+            msg.innerText = "";
+
+            try {
+                const img = await faceapi.bufferToImage(enrollImage.files[0]);
+                const detection = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+
+                if (!detection) throw new Error("ไม่พบใบหน้าในรูปภาพ หรือรูปภาพไม่ชัดเจน กรุณาถ่ายหน้าตรงใหม่");
+
+                const descriptorArray = Array.from(detection.descriptor);
+
+                await addDoc(collection(db, "students"), {
+                    studentId: studentId,
+                    name: name,
+                    descriptor: descriptorArray,
+                    createdAt: serverTimestamp()
+                });
+
+                msg.className = "text-sm mt-2 text-center text-green-600 font-bold";
+                msg.innerText = "✅ ลงทะเบียนสำเร็จ";
+                enrollForm.reset();
+                imagePreview.classList.add('hidden');
+                
+                await buildFaceMatcher();
+
+            } catch (err) {
+                console.error(err);
+                msg.className = "text-sm mt-2 text-center text-red-600 font-bold";
+                msg.innerText = err.message || "เกิดข้อผิดพลาดในการบันทึก";
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "บันทึกข้อมูล";
+            }
+        });
+
+        // ระบบกล้อง
+        const video = document.getElementById('video-element');
+        const canvas = document.getElementById('canvas-element');
+        const startCamBtn = document.getElementById('start-camera');
+        const stopCamBtn = document.getElementById('stop-camera');
+        const scanResultText = document.getElementById('scan-result');
+
+        startCamBtn.addEventListener('click', async () => {
+            if(!faceMatcher) {
+                alert("ยังไม่มีข้อมูลนักเรียนในระบบ กรุณาลงทะเบียนก่อน");
+                return;
+            }
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+                video.srcObject = stream;
+                startCamBtn.classList.add('hidden');
+                stopCamBtn.classList.remove('hidden');
+            } catch (err) {
+                alert("ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการเข้าถึงกล้อง");
+            }
+        });
+
+        stopCamBtn.addEventListener('click', () => {
+            if (stream) stream.getTracks().forEach(track => track.stop());
+            if (scanInterval) clearInterval(scanInterval);
+            const context = canvas.getContext('2d');
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            startCamBtn.classList.remove('hidden');
+            stopCamBtn.classList.add('hidden');
+            scanResultText.innerText = "";
+        });
+
+        video.addEventListener('play', () => {
+            const displaySize = { width: video.videoWidth, height: video.videoHeight };
+            faceapi.matchDimensions(canvas, displaySize);
+
+            scanInterval = setInterval(async () => {
+                const detections = await faceapi.detectAllFaces(video, new faceapi.SsdMobilenetv1Options())
+                    .withFaceLandmarks()
+                    .withFaceDescriptors();
+
+                const resizedDetections = faceapi.resizeResults(detections, displaySize);
+                const context = canvas.getContext('2d');
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                faceapi.draw.drawDetections(canvas, resizedDetections);
+
+                for (const detection of resizedDetections) {
+                    const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
+                    
+                    if (bestMatch.label !== 'unknown') {
+                        const [studentId, name] = bestMatch.label.split('|');
+                        const now = Date.now();
+                        const lastScan = cooldownMap.get(studentId) || 0;
+                        const box = detection.detection.box;
+                        const drawBox = new faceapi.draw.DrawBox(box, { label: name, boxColor: '#16a34a' });
+                        drawBox.draw(canvas);
+
+                        if (now - lastScan > 60000) {
+                            cooldownMap.set(studentId, now);
+                            scanResultText.className = "mt-4 text-xl font-bold text-green-600";
+                            scanResultText.innerText = `เช็คชื่อสำเร็จ: ${name} (${studentId})`;
+                            
+                            try {
+                                await addDoc(collection(db, "attendance"), {
+                                    studentId: studentId,
+                                    name: name,
+                                    timestamp: serverTimestamp()
+                                });
+                            } catch (e) { console.error("Error logging attendance:", e); }
+                        }
+                    } else {
+                        const box = detection.detection.box;
+                        const drawBox = new faceapi.draw.DrawBox(box, { label: "Unknown", boxColor: '#dc2626' });
+                        drawBox.draw(canvas);
+                    }
+                }
+            }, 500);
+        });
+
+        // ระบบ Dashboard
+        document.getElementById('refresh-dashboard').addEventListener('click', loadDashboard);
+
+        async function loadDashboard() {
+            const tbody = document.getElementById('attendance-table-body');
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center p-4">กำลังโหลด...</td></tr>';
+            
+            try {
+                const q = query(collection(db, "attendance"), orderBy("timestamp", "desc"), limit(50));
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="text-center p-4 text-gray-500">ไม่มีข้อมูล</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    let timeString = "กำลังประมวลผล";
+                    if(data.timestamp) {
+                        const date = data.timestamp.toDate();
+                        timeString = date.toLocaleString('th-TH');
+                    }
+                    
+                    const tr = document.createElement('tr');
+                    tr.className = "border-b border-gray-200 hover:bg-gray-50";
+                    tr.innerHTML = `
+                        <td class="p-3">${timeString}</td>
+                        <td class="p-3 font-semibold">${data.studentId}</td>
+                        <td class="p-3">${data.name}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error(err);
+                tbody.innerHTML = `<tr><td colspan="3" class="text-center p-4 text-red-500">เกิดข้อผิดพลาด: ${err.message}</td></tr>`;
+            }
+        }
+
+        // Global Tab Switcher
+        window.switchTab = function(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            if(tabId !== 'scanner') document.getElementById('stop-camera').click();
+            if(tabId === 'dashboard') loadDashboard();
+        }
+    </script>
+</body>
+</html>
