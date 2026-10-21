@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>โรงเรียนอุทยานศึกษากระบี่ - ระบบบันทึกเวลาเรียนด้วยใบหน้า</title>
+    <title>โรงเรียนอุทยานศึกษากระบี่ - ระบบบันทึกเวลาเรียนด้วยใบหน้า (Stable Pro)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -111,7 +111,7 @@
         <aside class="w-64 bg-slate-900 text-white flex flex-col shadow-xl z-10 shrink-0">
             <div class="p-6 border-b border-slate-800 flex flex-col gap-1">
                 <div class="flex items-center gap-3">
-                    <i class="fa-solid fa-face-viewfinder text-3xl text-sky-400"></i>
+                    <i class="fa-solid fa-shield-check text-3xl text-emerald-400"></i>
                     <span class="text-xl font-extrabold tracking-wider">Face KIOSK</span>
                 </div>
                 <span class="text-xs text-slate-400 font-semibold" id="sidebar-school-name">โรงเรียนอุทยานศึกษากระบี่</span>
@@ -138,7 +138,7 @@
         <!-- Main Content -->
         <main class="flex-1 flex flex-col h-full overflow-y-auto bg-slate-50 relative">
             <div id="status-bar" class="bg-slate-800 text-white p-2 text-center text-sm shadow-md sticky top-0 z-20 flex justify-center items-center gap-2">
-                <div class="spinner"></div><span id="status-text">กำลังเตรียมพร้อม AI และฐานข้อมูล...</span>
+                <div class="spinner"></div><span id="status-text">กำลังเตรียมพร้อม AI และดึงฐานข้อมูล...</span>
             </div>
 
             <div class="p-8 w-full max-w-7xl mx-auto">
@@ -254,7 +254,7 @@
                                     </div>
                                     <div>
                                         <label class="block text-xs font-bold text-slate-600 mb-1">ชั้นเรียน / สายการเรียน</label>
-                                        <input type="text" id="en-class" required placeholder="ม.6/1 สายวิทยาศาสตร์-คณิตศาสตร์" class="w-full p-2.5 border rounded-xl bg-slate-50 font-semibold outline-none focus:ring-2 focus:ring-sky-500">
+                                        <input type="text" id="en-class" required placeholder="ม.6/1 สายวิทย์-คณิต" class="w-full p-2.5 border rounded-xl bg-slate-50 font-semibold outline-none focus:ring-2 focus:ring-sky-500">
                                     </div>
                                 </div>
                                 <div>
@@ -285,10 +285,10 @@
         </main>
     </div>
 
-    <!-- ================= 3. หน้าจอ KIOSK เต็มหน้าจอ (ดีไซน์ตามรูปภาพ หัวเรื่อง - 4_3.jpg) ================= -->
+    <!-- ================= 3. หน้าจอ KIOSK เต็มหน้าจอ ================= -->
     <div id="kiosk-layout">
         
-        <!-- ลายเส้นกราฟิกพื้นหลังสีฟ้า-ชมพู -->
+        <!-- ลายเส้นกราฟิกพื้นหลัง -->
         <div class="kiosk-bg-graphic">
             <div class="stripe-blue"></div>
             <div class="stripe-pink"></div>
@@ -302,16 +302,14 @@
                     <img id="kiosk-logo" src="https://via.placeholder.com/150" alt="School Logo" class="w-full h-full object-contain">
                 </div>
                 <div>
-                    <!-- ชื่อโรงเรียน ตัวหนังสือใหญ่สีฟ้า -->
                     <h1 id="kiosk-school-title" class="text-4xl font-black text-sky-500 tracking-tight drop-shadow-sm">โรงเรียนอุทยานศึกษากระบี่</h1>
-                    <!-- ข้อความย่อย สีชมพู -->
                     <p class="text-xl font-extrabold text-pink-500 mt-0.5">ระบบบันทึกเวลาเรียนด้วยเทคโนโลยีจดจำใบหน้า</p>
                 </div>
             </div>
             
             <div class="text-right flex flex-col items-end">
                 <button id="exit-kiosk-btn" class="bg-slate-800/80 hover:bg-rose-600 text-white px-4 py-1.5 rounded-full text-xs font-bold transition backdrop-blur-sm shadow-md">
-                    <i class="fa-solid fa-xmark mr-1"></i> ออกจากหน้าจอ KIOSK
+                    <i class="fa-solid fa-xmark mr-1"></i> ปิดโหมดเต็มจอ
                 </button>
             </div>
         </header>
@@ -322,16 +320,16 @@
             <!-- ด้านซ้าย (70%): กล้อง + แถบสถิติด้านล่าง -->
             <div class="w-[68%] flex flex-col gap-4 h-full">
                 
-                <!-- กล้องสแกนใบหน้าขอบมนสีดำ -->
+                <!-- กล้องสแกนใบหน้า -->
                 <div class="flex-1 rounded-[2.5rem] overflow-hidden border-[6px] border-slate-900 shadow-2xl relative bg-black flex items-center justify-center">
                     <video id="kiosk-vid" autoplay muted playsinline class="hidden"></video>
                     <canvas id="kiosk-can" class="hidden"></canvas>
                     <div id="kiosk-placeholder" class="text-slate-500 text-xl font-bold flex flex-col items-center">
-                        <i class="fa-solid fa-spinner fa-spin text-5xl mb-4 text-sky-400"></i> กำลังเชื่อมต่อกล้องและเปิดระบบ...
+                        <i class="fa-solid fa-spinner fa-spin text-5xl mb-4 text-sky-400"></i> กำลังเชื่อมต่อกล้อง...
                     </div>
                 </div>
 
-                <!-- แถบสถิติด้านล่าง (การ์ดขาวขอบมน 4 ช่อง) -->
+                <!-- แถบสถิติด้านล่าง -->
                 <div class="h-28 bg-white/95 rounded-3xl shadow-xl border-2 border-sky-100 grid grid-cols-4 divide-x-2 divide-slate-100 overflow-hidden text-center shrink-0">
                     <div class="flex flex-col justify-center p-2">
                         <p class="text-base font-extrabold text-slate-800">จำนวนนักเรียนวันนี้</p>
@@ -373,13 +371,13 @@
     <canvas id="crop-canvas" class="hidden"></canvas>
 
 
-    <!-- ================= 4. Firebase & Application Logic ================= -->
+    <!-- ================= 4. Firebase & Stable Application Logic ================= -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 
-        // --- Firebase Config ของคุณ ---
+        // --- Firebase Config ---
         const firebaseConfig = {
             apiKey: "AIzaSyA_sa2vM6b_Tf_D5k4oQD2BAyaNHecU2GQ",
             authDomain: "dimension-a9dca.firebaseapp.com",
@@ -393,11 +391,15 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // --- Global Variables ---
+        // --- Global Variables (Stable Logic) ---
         let faceMatcher = null;
         let activeStream = null;
         let activeEnrollStream = null;
-        let scanInterval = null; 
+        
+        // ตัวควบคุม AI ให้ลื่นไหลและไม่ค้าง (Anti-Freeze mechanism)
+        let isDetecting = false; 
+        let isProcessingFrame = false; 
+        
         let clockInterval = null;
         const cooldown = new Map();
         let studentsData = {};
@@ -471,7 +473,7 @@
                 ]);
                 await syncDB();
                 document.getElementById('status-bar').classList.replace('bg-slate-800', 'bg-emerald-600');
-                document.getElementById('status-text').innerText = "✅ โมเดล AI และข้อมูลนักเรียนพร้อมทำงานแล้ว";
+                document.getElementById('status-text').innerText = "✅ ระบบเสถียร AI และฐานข้อมูลพร้อมทำงาน";
                 document.querySelector('.spinner').style.display = 'none';
                 setTimeout(() => document.getElementById('status-bar').style.display = 'none', 3000);
             } catch (e) { alert("โหลด AI ล้มเหลว กรุณารีเฟรชหน้าจอ"); }
@@ -495,8 +497,8 @@
                     studentsData[d.studentId] = d;
                 }
             });
-            // ตั้งค่า Matcher Threshold เป็น 0.45 เพื่อความแม่นยำและตรวจจับติดง่าย
-            faceMatcher = labels.length > 0 ? new faceapi.FaceMatcher(labels, 0.45) : null;
+            // 0.42 คือค่าที่แม่นยำที่สุด ป้องกันการจำผิดเวลาเดินผ่านกล้องไวๆ
+            faceMatcher = labels.length > 0 ? new faceapi.FaceMatcher(labels, 0.42) : null;
         }
 
         document.getElementById('force-sync-btn').onclick = async () => {
@@ -507,13 +509,17 @@
 
         // --- Registration / Enrollment ---
         document.getElementById('start-enroll-btn').onclick = async () => {
-            activeEnrollStream = await navigator.mediaDevices.getUserMedia({video: true});
-            const v = document.getElementById('en-vid');
-            v.srcObject = activeEnrollStream;
-            v.classList.remove('hidden');
-            document.getElementById('en-icon').classList.add('hidden');
-            document.getElementById('enroll-cam-box').classList.add('border-sky-500');
-            document.getElementById('save-enroll-btn').disabled = false;
+            try {
+                activeEnrollStream = await navigator.mediaDevices.getUserMedia({video: true});
+                const v = document.getElementById('en-vid');
+                v.srcObject = activeEnrollStream;
+                v.classList.remove('hidden');
+                document.getElementById('en-icon').classList.add('hidden');
+                document.getElementById('enroll-cam-box').classList.add('border-sky-500');
+                document.getElementById('save-enroll-btn').disabled = false;
+            } catch(e) {
+                alert("ไม่สามารถเปิดกล้องได้ โปรดตรวจสอบการอนุญาตใช้งานกล้อง");
+            }
         };
 
         document.getElementById('enroll-form').onsubmit = async (e) => {
@@ -523,8 +529,9 @@
             btn.disabled = true; btn.innerText = "กำลังประมวลผล...";
             
             try {
+                // เกณฑ์ลงทะเบียนง่ายขึ้น (scoreThreshold 0.3)
                 const det = await faceapi.detectSingleFace(document.getElementById('en-vid'), new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 })).withFaceLandmarks().withFaceDescriptor();
-                if(!det) throw new Error("ไม่พบใบหน้า กรุณาปรับแสงสว่างและมองตรงมาที่กล้อง");
+                if(!det) throw new Error("ไม่พบใบหน้า กรุณาให้หน้าอยู่ในกล้องให้ชัดเจนที่สุด");
                 
                 await addDoc(collection(db, "students"), {
                     studentId: document.getElementById('en-id').value,
@@ -537,7 +544,7 @@
                 document.getElementById('enroll-msg').innerHTML = `<span class="text-emerald-600">ลงทะเบียนสำเร็จ!</span>`;
                 e.target.reset(); 
                 
-                if(activeEnrollStream) { activeEnrollStream.getTracks().forEach(t => t.stop()); }
+                if(activeEnrollStream) { activeEnrollStream.getTracks().forEach(t => t.stop()); activeEnrollStream = null; }
                 document.getElementById('en-vid').classList.add('hidden');
                 document.getElementById('en-icon').classList.remove('hidden');
                 document.getElementById('enroll-cam-box').classList.remove('border-sky-500');
@@ -565,31 +572,32 @@
             document.getElementById('stat-late').innerText = statData.late;
         }
 
-        // ฟังก์ชันตัดภาพเฉพาะใบหน้าจากวิดีโอ (Face Crop)
+        // ระบบตัดรูปใบหน้ากัน Error (Safe Crop)
         function captureFaceCrop(box) {
             try {
                 const ctx = cropCanvas.getContext('2d');
-                const pad = 30; // ขยายกรอบรอบหน้าเล็กน้อย
+                const pad = 20; 
+                // ป้องกันพิกัดติดลบเวลาเดินตกขอบกล้อง
                 const x = Math.max(0, box.x - pad);
                 const y = Math.max(0, box.y - pad);
                 const w = Math.min(kioskVid.videoWidth - x, box.width + pad * 2);
                 const h = Math.min(kioskVid.videoHeight - y, box.height + pad * 2);
 
+                if(w <= 0 || h <= 0) return 'https://via.placeholder.com/150';
+
                 cropCanvas.width = w;
                 cropCanvas.height = h;
                 
-                // วาดภาพย้อนกลับ (Mirror) เพื่อให้ตรงกับกล้อง
                 ctx.translate(w, 0);
                 ctx.scale(-1, 1);
                 ctx.drawImage(kioskVid, x, y, w, h, 0, 0, w, h);
                 
-                return cropCanvas.toDataURL('image/jpeg', 0.8);
+                return cropCanvas.toDataURL('image/jpeg', 0.7); // 0.7 ลดขนาดรูปลงเพื่อให้เร็วขึ้น
             } catch (e) {
                 return 'https://via.placeholder.com/150';
             }
         }
 
-        // ฟังก์ชันสร้าง Feed การ์ดแสดงผลด้านขวา (ตรงตามรูปภาพ หัวเรื่อง - 4_3.jpg)
         function addFeedCard(student, statusStr, timeStr, croppedImgData, isMatched) {
             const isLate = statusStr === "มาสาย";
             const timeCol = isLate ? 'text-rose-600' : 'text-emerald-600';
@@ -600,15 +608,12 @@
             
             if (isMatched) {
                 card.innerHTML = `
-                    <!-- รูปถ่ายใบหน้าจริง + ไอคอนสถานะ -->
                     <div class="relative w-20 h-24 shrink-0 rounded-2xl overflow-hidden border-2 border-white shadow-md bg-slate-200">
                         <img src="${croppedImgData}" class="w-full h-full object-cover">
                         <div class="absolute bottom-1 right-1 w-6 h-6 rounded-full ${badgeIcon} flex items-center justify-center text-xs font-bold shadow-md">
                             <i class="fa-solid ${isMatched ? 'fa-check' : 'fa-xmark'}"></i>
                         </div>
                     </div>
-                    
-                    <!-- กล่องข้อมูลสีฟ้าขวามือ -->
                     <div class="flex-1 bg-sky-50 border-2 border-sky-200 rounded-2xl p-2.5 text-center shadow-sm">
                         <p class="font-extrabold text-slate-900 text-sm leading-tight">${student.studentId}</p>
                         <p class="font-extrabold text-slate-800 text-xs mt-0.5 truncate">${student.name}</p>
@@ -626,12 +631,13 @@
                     </div>
                     <div class="flex-1 bg-sky-50 border-2 border-sky-200 rounded-2xl p-3 text-center shadow-sm">
                         <p class="font-extrabold text-rose-600 text-sm">ไม่พบรายชื่อในระบบ</p>
-                        <p class="text-[11px] font-bold text-slate-500 mt-1">โปรดแจ้งปัญหากับคุณครู</p>
+                        <p class="text-[11px] font-bold text-slate-500 mt-1">โปรดลงทะเบียนก่อน</p>
                     </div>
                 `;
             }
 
             feedContainer.insertBefore(card, feedContainer.firstChild);
+            // ลบการ์ดเก่าออกเพื่อป้องกันหน่วยความจำเต็ม
             if(feedContainer.children.length > 8) feedContainer.lastChild.remove();
         }
 
@@ -646,6 +652,7 @@
             document.getElementById('kiosk-layout').classList.add('active');
             
             try {
+                // ขอความละเอียดระดับ 720p ก็เพียงพอต่อการสแกน และไม่ทำให้คอมค้าง
                 activeStream = await navigator.mediaDevices.getUserMedia({
                     video: { width: { ideal: 1280 }, height: { ideal: 720 } }
                 });
@@ -654,7 +661,6 @@
                 kioskCan.classList.remove('hidden');
                 document.getElementById('kiosk-placeholder').classList.add('hidden');
                 
-                // นาฬิกา Kiosk
                 clockInterval = setInterval(() => {
                     const now = new Date();
                     const h = String(now.getHours()).padStart(2, '0');
@@ -666,7 +672,7 @@
         };
 
         function exitKioskMode() {
-            if(scanInterval) clearInterval(scanInterval);
+            isDetecting = false; 
             if(activeStream) activeStream.getTracks().forEach(t => t.stop());
             if(clockInterval) clearInterval(clockInterval);
             
@@ -679,70 +685,94 @@
         }
         document.getElementById('exit-kiosk-btn').onclick = exitKioskMode;
 
-        // ลูปประมวลผลกล้องสแกนสด
-        kioskVid.onplay = () => {
-            faceapi.matchDimensions(kioskCan, kioskVid);
+        // --- ระบบ AI Lock ป้องกันคอมค้าง (Stable Async Loop) ---
+        async function runFaceDetectionLoop() {
+            if (!isDetecting) return;
             
-            scanInterval = setInterval(async () => {
-                try {
-                    const dets = await faceapi.detectAllFaces(kioskVid, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }))
-                                              .withFaceLandmarks().withFaceDescriptors();
-                                              
-                    const resDets = faceapi.resizeResults(dets, kioskVid);
-                    const ctx = kioskCan.getContext('2d');
-                    ctx.clearRect(0,0,kioskCan.width,kioskCan.height);
-                    
-                    for(const d of resDets) {
-                        const match = faceMatcher.findBestMatch(d.descriptor);
-                        const box = d.detection.box;
+            // ถ้าระบบกำลังคิดอยู่ ห้ามสั่งงานซ้อน (นี่คือตัวที่ทำให้เครื่องไม่ค้าง)
+            if (isProcessingFrame) {
+                requestAnimationFrame(runFaceDetectionLoop);
+                return;
+            }
 
-                        if(match.label !== 'unknown') {
-                            const sid = match.label;
-                            const student = studentsData[sid];
-                            const now = new Date();
-                            const nowMs = now.getTime();
+            isProcessingFrame = true;
+
+            try {
+                const dets = await faceapi.detectAllFaces(kioskVid, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }))
+                                          .withFaceLandmarks().withFaceDescriptors();
+                                          
+                const resDets = faceapi.resizeResults(dets, kioskVid);
+                const ctx = kioskCan.getContext('2d');
+                ctx.clearRect(0,0,kioskCan.width,kioskCan.height);
+                
+                for(const d of resDets) {
+                    const match = faceMatcher.findBestMatch(d.descriptor);
+                    const box = d.detection.box;
+
+                    if(match.label !== 'unknown') {
+                        const sid = match.label;
+                        const student = studentsData[sid];
+                        const now = new Date();
+                        const nowMs = now.getTime();
+                        
+                        new faceapi.draw.DrawBox(box, {label: student.name, boxColor: '#10b981'}).draw(kioskCan);
+                        
+                        const lastScanTime = cooldown.get(sid) || 0;
+                        if(nowMs - lastScanTime > 300000) { // Cooldown 5 นาที
+                            cooldown.set(sid, nowMs);
                             
-                            // วาดกรอบสีเขียวบนวิดีโอ
-                            new faceapi.draw.DrawBox(box, {label: student.name, boxColor: '#10b981'}).draw(kioskCan);
+                            const timeStr = now.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'});
+                            const status = (timeStr > LATE_TIME) ? "มาสาย" : "มาปกติ";
                             
-                            const lastScanTime = cooldown.get(sid) || 0;
-                            if(nowMs - lastScanTime > 300000) { // Cooldown 5 นาที
-                                cooldown.set(sid, nowMs);
-                                
-                                const timeStr = now.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'});
-                                const status = (timeStr > LATE_TIME) ? "มาสาย" : "มาปกติ";
-                                
-                                if(!scannedToday.has(sid)) {
-                                    scannedToday.add(sid);
-                                    statData.total++;
-                                    if(status === "มาปกติ") statData.ontime++; else statData.late++;
-                                    updateKioskStats();
-                                }
-
-                                // Crop รูปถ่ายใบหน้าตอนสแกนติด
-                                const faceCropImg = captureFaceCrop(box);
-
-                                // เพิ่มการ์ดแสดงผลบน Feed ด้านขวา
-                                addFeedCard(student, status, timeStr, faceCropImg, true);
-                                
-                                // บันทึกลง Firebase
-                                addDoc(collection(db, "attendance"), {
-                                    studentId: sid,
-                                    name: student.name,
-                                    level: student.level || '-',
-                                    gate: KIOSK_GATE,
-                                    status: status,
-                                    method: "Face Scan",
-                                    timestamp: serverTimestamp()
-                                }).catch(err => console.log("Firebase Log Error:", err));
+                            if(!scannedToday.has(sid)) {
+                                scannedToday.add(sid);
+                                statData.total++;
+                                if(status === "มาปกติ") statData.ontime++; else statData.late++;
+                                updateKioskStats();
                             }
-                        } else {
-                            // กรณีไม่พบชื่อในระบบ
-                            new faceapi.draw.DrawBox(box, {label: "ไม่พบข้อมูล", boxColor: '#f43f5e'}).draw(kioskCan);
+
+                            const faceCropImg = captureFaceCrop(box);
+                            addFeedCard(student, status, timeStr, faceCropImg, true);
+                            
+                            addDoc(collection(db, "attendance"), {
+                                studentId: sid,
+                                name: student.name,
+                                level: student.level || '-',
+                                gate: KIOSK_GATE,
+                                status: status,
+                                method: "Face Scan",
+                                timestamp: serverTimestamp()
+                            }).catch(err => console.log("Firebase Log Error:", err));
+                        }
+                    } else {
+                        new faceapi.draw.DrawBox(box, {label: "ไม่รู้จัก", boxColor: '#f43f5e'}).draw(kioskCan);
+                        
+                        // ระบบป้องกันการยิงรูปหน้าคนแปลกหน้าซ้ำๆ (หน่วงเวลา Unknown)
+                        const unknownTime = cooldown.get('unknown_block') || 0;
+                        if(new Date().getTime() - unknownTime > 3000) {
+                            cooldown.set('unknown_block', new Date().getTime());
+                            const faceCropImg = captureFaceCrop(box);
+                            addFeedCard({}, "มาสาย", "--:--", faceCropImg, false);
                         }
                     }
-                } catch (e) { }
-            }, 300); // วนลูปสแกนทุกๆ 300ms
+                }
+            } catch (e) { 
+                // Ignore silent errors during stream startup/teardown
+            }
+
+            isProcessingFrame = false;
+            
+            // ให้เบราว์เซอร์พักหายใจ 100ms ก่อนเริ่มเฟรมใหม่ (สำคัญมาก ป้องกันความร้อน)
+            setTimeout(() => {
+                if(isDetecting) requestAnimationFrame(runFaceDetectionLoop);
+            }, 100);
+        }
+
+        kioskVid.onplay = () => {
+            faceapi.matchDimensions(kioskCan, kioskVid);
+            isDetecting = true;
+            isProcessingFrame = false;
+            runFaceDetectionLoop(); // เริ่มระบบลูป
         };
 
         // --- Reports & Excel Export ---
@@ -793,11 +823,12 @@
                     } else if (filter === 'this_month') {
                         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
                     }
-                    q = query(collRef, where("timestamp", ">=", startDate), orderBy("timestamp", "desc"));
+                    // หมายเหตุ: Firestore ต้องมีการทำ Index ไว้สำหรับ query แบบนี้
+                    q = query(collRef, orderBy("timestamp", "desc")); 
                 }
 
                 const snap = await getDocs(q);
-                if (snap.empty) { alert("ไม่มีข้อมูลในขอบเขตเวลาที่เลือก"); return; }
+                if (snap.empty) { alert("ไม่มีข้อมูลในระบบ"); return; }
 
                 const exportData = [
                     ["วัน-เวลาที่สแกน", "รหัสนักเรียน", "ชื่อ-นามสกุล", "ชั้นเรียน/สายเรียน", "สถานะ", "จุดสแกนประตู", "วิธีสแกน"]
@@ -805,11 +836,24 @@
 
                 snap.forEach(doc => {
                     const d = doc.data();
-                    const dateStr = d.timestamp ? d.timestamp.toDate().toLocaleString('th-TH') : "";
+                    const dateObj = d.timestamp ? d.timestamp.toDate() : null;
+                    
+                    // Manual filter for safety if Firebase Index is not set up
+                    if(filter === 'today' && dateObj) {
+                        const today = new Date();
+                        if(dateObj.getDate() !== today.getDate() || dateObj.getMonth() !== today.getMonth()) return;
+                    } else if (filter === 'this_month' && dateObj) {
+                        const today = new Date();
+                        if(dateObj.getMonth() !== today.getMonth() || dateObj.getFullYear() !== today.getFullYear()) return;
+                    }
+
+                    const dateStr = dateObj ? dateObj.toLocaleString('th-TH') : "";
                     exportData.push([
                         dateStr, d.studentId, d.name, d.level || "-", d.status, d.gate || "-", d.method || "-"
                     ]);
                 });
+
+                if(exportData.length === 1) { alert("ไม่มีข้อมูลในขอบเขตเวลาที่เลือก"); return; }
 
                 const ws = XLSX.utils.aoa_to_sheet(exportData);
                 const wb = XLSX.utils.book_new();
