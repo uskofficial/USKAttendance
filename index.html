@@ -26,6 +26,9 @@
         video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); position: absolute; top: 0; left: 0; z-index: 1; }
         /* บังคับ Canvas ให้อยู่เลเยอร์บนสุด (z-index: 10) และห้ามกั้นการคลิก */
         canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); object-fit: cover; z-index: 10; pointer-events: none; }
+        /* [FIX] Tailwind preflight ตั้ง video{height:auto} ทับกฎด้านบน ทำให้ภาพกับกรอบเหลื่อมกัน -> ใช้ selector ที่หนักกว่าให้ขนาดเท่ากันเสมอ */
+        .camera-box video, .camera-box canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+        .camera-box canvas { z-index: 10; }
         
         /* สไตล์ Kiosk เต็มหน้าจอ */
         #kiosk-layout { display: none; }
@@ -312,6 +315,10 @@
                     <div id="kiosk-placeholder" class="text-slate-500 text-xl font-bold flex flex-col items-center z-20 absolute">
                         <i class="fa-solid fa-spinner fa-spin text-5xl mb-4 text-sky-400"></i> กำลังเชื่อมต่อกล้อง...
                     </div>
+
+                    <!-- [เพิ่ม] แถบสถานะ AI มุมซ้ายบน / แถบสถานะการบันทึกมุมซ้ายล่าง -->
+                    <div id="kiosk-ai-status" class="absolute top-4 left-4 z-30 text-white text-sm font-bold px-4 py-1.5 rounded-full shadow-lg hidden" style="background: rgba(15,23,42,.7);"></div>
+                    <div id="kiosk-save-status" class="absolute bottom-4 left-4 z-30 text-white text-sm font-bold px-4 py-2 rounded-2xl shadow-lg hidden"></div>
                 </div>
 
                 <!-- แถบสถิติด้านล่าง -->
@@ -386,6 +393,11 @@
         let statData = { total: 0, ontime: 0, late: 0 };
         const scannedToday = new Set(); 
 
+        // --- [เพิ่ม] ค่าตั้งต้นของระบบตรวจจับใบหน้า (ปรับตัวเลขตรงนี้ได้) ---
+        const DETECT_SCORE = 0.4;      // ความมั่นใจขั้นต่ำในการตรวจจับใบหน้า (ต่ำ = จับง่ายแต่มีกรอบหลอกมาก)
+        const MATCH_THRESHOLD = 0.5;   // ระยะห่างใบหน้าที่ยอมรับว่าเป็นคนเดียวกัน (ยิ่งน้อยยิ่งเข้มงวด เดิม 0.42)
+        let enrollLoopId = 0;
+
         function loadSettings() {
             const sn = localStorage.getItem('cfg_school_name') || 'โรงเรียนอุทยานศึกษากระบี่';
             const logo = localStorage.getItem('cfg_logo_url') || 'https://via.placeholder.com/150';
@@ -458,8 +470,9 @@
         async function syncDB() {
             let rawData = [];
             const cachedData = localStorage.getItem('school_students_cache');
-            if (cachedData) { 
-                rawData = JSON.parse(cachedData); 
+            let cachedList = []; try { cachedList = JSON.parse(cachedData || '[]'); } catch (e) { cachedList = []; }
+            if (cachedList.length > 0) { 
+                rawData = cachedList; 
             } else {
                 const snap = await getDocs(collection(db, "students"));
                 snap.forEach(doc => rawData.push(doc.data()));
@@ -474,7 +487,7 @@
                 }
             });
             // ถึงไม่มีข้อมูลนักเรียน ก็สร้าง Matcher ให้เป็น null ไว้ก่อน เพื่อให้กรอบตรวจจับยังขึ้นเป็น "ไม่พบข้อมูล"
-            faceMatcher = labels.length > 0 ? new faceapi.FaceMatcher(labels, 0.42) : null;
+            faceMatcher = labels.length > 0 ? new faceapi.FaceMatcher(labels, MATCH_THRESHOLD) : null;
         }
 
         document.getElementById('force-sync-btn').onclick = async () => {
@@ -493,6 +506,7 @@
                 document.getElementById('en-icon').classList.add('hidden');
                 document.getElementById('enroll-cam-box').classList.add('border-sky-500');
                 document.getElementById('save-enroll-btn').disabled = false;
+                startEnrollDetection(); // [เพิ่ม] แสดงกรอบตรวจจับใบหน้าตอนลงทะเบียน
             } catch(e) {
                 alert("ไม่สามารถเปิดกล้องได้");
             }
@@ -540,6 +554,106 @@
         
         let KIOSK_GATE = "ประตู 1";
         let LATE_TIME = "08:00";
+
+        // ===== [เพิ่ม] ฟังก์ชันวาดกรอบตรวจจับ + แถบสถานะ =====
+        // Canvas ถูกกลับซ้าย-ขวาด้วย CSS (ให้ตรงกับวิดีโอ) จึงต้องพลิกตัวอักษรกลับ มิฉะนั้นข้อความจะเป็นภาพสะท้อน
+        function drawFaceBox(ctx, box, label, color) {
+            const cw = ctx.canvas.width;
+            const { x, y, width: w, height: h } = box;
+
+            // กรอบใบหน้า
+            ctx.save();
+            ctx.lineWidth = Math.max(3, Math.round(cw / 320));
+            ctx.strokeStyle = color;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 12;
+            ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(x, y, w, h, 12); else ctx.rect(x, y, w, h);
+            ctx.stroke();
+            ctx.restore();
+
+            // ป้ายชื่อ (ยึดมุมซ้ายบนของกรอบตามที่ตามองเห็น = ขอบขวาในพิกัด Canvas)
+            ctx.save();
+            const fontPx = Math.max(18, Math.round(cw / 45));
+            ctx.font = `700 ${fontPx}px Sarabun, sans-serif`;
+            const labelW = ctx.measureText(label).width + fontPx * 1.2;
+            const labelH = fontPx * 1.7;
+            let lx = x + w - labelW;
+            lx = Math.max(0, Math.min(lx, cw - labelW));
+            let ly = y - labelH - 2;
+            if (ly < 0) ly = y + 2;
+            ctx.fillStyle = color;
+            ctx.fillRect(lx, ly, labelW, labelH);
+            ctx.translate(lx + labelW / 2, ly + labelH / 2);
+            ctx.scale(-1, 1);
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, 0, 0);
+            ctx.restore();
+        }
+
+        function setAIStatus(text, isWarn = false) {
+            const el = document.getElementById('kiosk-ai-status');
+            if (!el) return;
+            el.classList.remove('hidden');
+            el.textContent = text;
+            el.style.background = isWarn ? 'rgba(225,29,72,.92)' : 'rgba(15,23,42,.7)';
+        }
+
+        let saveStatusTimer = null;
+        function showSaveStatus(ok, msg) {
+            const el = document.getElementById('kiosk-save-status');
+            if (!el) return;
+            el.textContent = (ok ? '✅ ' : '❌ บันทึกไม่สำเร็จ: ') + msg;
+            el.style.background = ok ? 'rgba(5,150,105,.92)' : 'rgba(225,29,72,.95)';
+            el.classList.remove('hidden');
+            clearTimeout(saveStatusTimer);
+            saveStatusTimer = setTimeout(() => el.classList.add('hidden'), ok ? 3000 : 8000);
+        }
+
+        // กรอบตรวจจับในหน้าลงทะเบียน (ใช้ en-can ที่มีอยู่เดิมแต่ไม่เคยถูกใช้งาน)
+        async function startEnrollDetection() {
+            const v = document.getElementById('en-vid');
+            const c = document.getElementById('en-can');
+            const myId = ++enrollLoopId;
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+            while (activeEnrollStream && myId === enrollLoopId && (v.videoWidth === 0 || v.readyState < 2)) await sleep(100);
+            if (!activeEnrollStream || myId !== enrollLoopId) return;
+
+            c.classList.remove('hidden');
+            while (activeEnrollStream && myId === enrollLoopId) {
+                try {
+                    if (c.width !== v.videoWidth || c.height !== v.videoHeight) { c.width = v.videoWidth; c.height = v.videoHeight; }
+                    const det = await faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: DETECT_SCORE }));
+                    const ctx = c.getContext('2d');
+                    ctx.clearRect(0, 0, c.width, c.height);
+                    if (det) drawFaceBox(ctx, det.box, 'ตรวจพบใบหน้า', '#10b981');
+                } catch (e) { console.warn('Enroll detect error:', e); }
+                await sleep(200);
+            }
+            if (!activeEnrollStream) {
+                c.getContext('2d').clearRect(0, 0, c.width, c.height);
+                c.classList.add('hidden');
+            }
+        }
+
+        // ตัวสตาร์ทสำรอง: ถ้า event loadeddata ไม่ยิงบน Safari/iPad ให้เริ่มลูปตรวจจับเอง (ถ้าเริ่มไปแล้วจะไม่ทำซ้ำ)
+        async function ensureKioskDetection() {
+            const myStream = activeStream;
+            setAIStatus('⏳ กำลังเตรียมกล้องและ AI...');
+            await new Promise(r => setTimeout(r, 2000));
+            for (let i = 0; i < 100 && activeStream === myStream && kioskVid.videoWidth === 0; i++) {
+                await new Promise(r => setTimeout(r, 100));
+            }
+            if (activeStream !== myStream || isDetecting || kioskVid.videoWidth === 0) return;
+            kioskCan.width = kioskVid.videoWidth;
+            kioskCan.height = kioskVid.videoHeight;
+            isDetecting = true;
+            isProcessingFrame = false;
+            runFaceDetectionLoop();
+        }
 
         function updateKioskStats() {
             document.getElementById('stat-total').innerText = statData.total;
@@ -627,6 +741,8 @@
                     video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }
                 });
                 kioskVid.srcObject = activeStream;
+                kioskVid.play().catch(() => {});
+                ensureKioskDetection();
                 kioskVid.classList.remove('hidden');
                 kioskCan.classList.remove('hidden');
                 document.getElementById('kiosk-placeholder').classList.add('hidden');
@@ -649,6 +765,8 @@
             kioskVid.classList.add('hidden');
             kioskCan.classList.add('hidden');
             document.getElementById('kiosk-placeholder').classList.remove('hidden');
+            document.getElementById('kiosk-ai-status').classList.add('hidden');
+            document.getElementById('kiosk-save-status').classList.add('hidden');
             
             document.getElementById('kiosk-layout').classList.remove('active');
             document.getElementById('app-view').classList.remove('hidden');
@@ -670,16 +788,20 @@
                 if (kioskCan.width !== kioskVid.videoWidth || kioskCan.height !== kioskVid.videoHeight) {
                     kioskCan.width = kioskVid.videoWidth;
                     kioskCan.height = kioskVid.videoHeight;
-                    faceapi.matchDimensions(kioskCan, kioskVid);
+                    // [FIX] เอา faceapi.matchDimensions(canvas, video) ออก: มันอ่าน video.width (=0) แล้วทำให้ Canvas เป็น 0x0 จนวาดกรอบไม่ได้
                 }
 
                 // ลด Threshold ลงเหลือ 0.2 เพื่อให้มันจับหน้าคนได้ง่ายมากๆ (แม้จะเดินผ่านไวๆ หรือขยับตัว)
-                const dets = await faceapi.detectAllFaces(kioskVid, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.2 }))
+                const dets = await faceapi.detectAllFaces(kioskVid, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: DETECT_SCORE }))
                                           .withFaceLandmarks().withFaceDescriptors();
                                           
-                const resDets = faceapi.resizeResults(dets, kioskVid);
+                // [FIX] resizeResults ต้องรับ {width,height} ไม่ใช่ element (video.width=0 ทำให้ error ทุกเฟรม)
+                const displaySize = { width: kioskVid.videoWidth, height: kioskVid.videoHeight };
+                const resDets = faceapi.resizeResults(dets, displaySize);
                 const ctx = kioskCan.getContext('2d');
                 ctx.clearRect(0,0,kioskCan.width,kioskCan.height);
+                if (!faceMatcher) setAIStatus(`⚠ ยังไม่มีข้อมูลใบหน้านักเรียนในฐานข้อมูล • พบใบหน้า ${resDets.length}`, true);
+                else setAIStatus(`🟢 AI ทำงาน • พบใบหน้า ${resDets.length} • ฐานข้อมูล ${Object.keys(studentsData).length} คน`);
                 
                 for(const d of resDets) {
                     const box = d.detection.box;
@@ -700,7 +822,7 @@
                     }
 
                     // บังคับวาดกรอบลง Canvas ทันทีที่ประมวลผลเสร็จ เพื่อให้เห็นกรอบตลอดเวลา
-                    new faceapi.draw.DrawBox(box, {label: labelText, boxColor: boxColor}).draw(kioskCan);
+                    drawFaceBox(ctx, box, labelText, boxColor); // [FIX] วาดเอง เพื่อให้ตัวอักษรไม่กลับด้านตาม Canvas
                     
                     // ระบบบันทึกเข้า Database (มี Cooldown 5 นาที)
                     if (isKnown && matchedStudent) {
@@ -712,7 +834,7 @@
                         if(nowMs - lastScanTime > 300000) { 
                             cooldown.set(sid, nowMs);
                             
-                            const timeStr = now.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'});
+                            const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
                             const status = (timeStr > LATE_TIME) ? "มาสาย" : "มาปกติ";
                             
                             if(!scannedToday.has(sid)) {
@@ -733,7 +855,8 @@
                                 status: status,
                                 method: "Face Scan",
                                 timestamp: serverTimestamp()
-                            }).catch(err => console.log("Firebase Log Error:", err));
+                            }).then(() => showSaveStatus(true, `บันทึกเวลาแล้ว: ${matchedStudent.name} (${status})`))
+                            .catch(err => { console.error("Firebase Log Error:", err); showSaveStatus(false, err.message || 'ไม่ทราบสาเหตุ'); });
                         }
                     } else {
                         // ป้องกันการยิงหน้าจอซ้ำๆ ตอนคนแปลกหน้ายืนแช่
@@ -746,7 +869,7 @@
                     }
                 }
             } catch (e) { 
-                // ซ่อน Error ไม่ให้รบกวนหน้าจอ
+                console.error('Face loop error:', e); setAIStatus('⚠ ตรวจจับผิดพลาด: ' + (e && e.message ? e.message : e), true);
             }
 
             isProcessingFrame = false;
@@ -765,7 +888,7 @@
             }
             kioskCan.width = kioskVid.videoWidth;
             kioskCan.height = kioskVid.videoHeight;
-            faceapi.matchDimensions(kioskCan, kioskVid);
+            // [FIX] เอา faceapi.matchDimensions(canvas, video) ออก: มันอ่าน video.width (=0) แล้วทำให้ Canvas เป็น 0x0 จนวาดกรอบไม่ได้
             
             isDetecting = true;
             isProcessingFrame = false;
