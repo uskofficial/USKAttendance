@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>โรงเรียนอุทยานศึกษากระบี่ - ระบบบันทึกเวลาเรียนด้วยใบหน้า (Stable Pro)</title>
+    <title>โรงเรียนอุทยานศึกษากระบี่ - ระบบบันทึกเวลาเรียนด้วยใบหน้า (iPad Pro Fix)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -21,9 +21,11 @@
         .spinner { border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top: 4px solid #fff; width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        .camera-box { position: relative; width: 100%; height: 100%; background: #000; overflow: hidden; }
-        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); object-fit: cover; }
+        /* แก้ไขโครงสร้างกล้องให้วาดกรอบได้ชัวร์ 100% บน iPad */
+        .camera-box { position: relative; width: 100%; height: 100%; background: #000; overflow: hidden; border-radius: inherit; }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); position: absolute; top: 0; left: 0; z-index: 1; }
+        /* บังคับ Canvas ให้อยู่เลเยอร์บนสุด (z-index: 10) และห้ามกั้นการคลิก */
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); object-fit: cover; z-index: 10; pointer-events: none; }
         
         /* สไตล์ Kiosk เต็มหน้าจอ */
         #kiosk-layout { display: none; }
@@ -40,38 +42,18 @@
             overflow: hidden;
         }
 
-        /* ลวดลายเรขาคณิตพื้นหลังแบบในรูปตัวอย่าง */
-        .kiosk-bg-graphic {
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-            z-index: 0;
-            overflow: hidden;
-        }
+        .kiosk-bg-graphic { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
         .kiosk-bg-graphic .stripe-blue {
-            position: absolute;
-            top: -100px;
-            right: -100px;
-            width: 500px;
-            height: 500px;
+            position: absolute; top: -100px; right: -100px; width: 500px; height: 500px;
             background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
-            transform: rotate(-35deg);
-            opacity: 0.85;
-            clip-path: polygon(0 0, 100% 0, 100% 40%, 0 80%);
+            transform: rotate(-35deg); opacity: 0.85; clip-path: polygon(0 0, 100% 0, 100% 40%, 0 80%);
         }
         .kiosk-bg-graphic .stripe-pink {
-            position: absolute;
-            bottom: -150px;
-            left: -100px;
-            width: 600px;
-            height: 400px;
+            position: absolute; bottom: -150px; left: -100px; width: 600px; height: 400px;
             background: linear-gradient(135deg, #ec4899 0%, #f472b6 100%);
-            transform: rotate(-20deg);
-            opacity: 0.85;
-            clip-path: polygon(0 40%, 100% 0, 100% 100%, 0 100%);
+            transform: rotate(-20deg); opacity: 0.85; clip-path: polygon(0 40%, 100% 0, 100% 100%, 0 100%);
         }
 
-        /* รายการฟีดบันทึกล่าสุด */
         .feed-card { animation: slideIn 0.35s ease-out; }
         @keyframes slideIn { from { transform: translateX(60px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
@@ -127,7 +109,7 @@
                     <i class="fa-solid fa-desktop w-5"></i> หน้าจอ KIOSK สแกนสด
                 </button>
                 <button onclick="navTo('settings')" id="nav-settings" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left hover:bg-slate-800 transition font-bold">
-                    <i class="fa-solid fa-sliders w-5"></i> ตั้งค่าโรงเรียน / โลโก้
+                    <i class="fa-solid fa-sliders w-5"></i> ตั้งค่าระบบ
                 </button>
             </nav>
             <div class="p-4 border-t border-slate-800">
@@ -138,7 +120,7 @@
         <!-- Main Content -->
         <main class="flex-1 flex flex-col h-full overflow-y-auto bg-slate-50 relative">
             <div id="status-bar" class="bg-slate-800 text-white p-2 text-center text-sm shadow-md sticky top-0 z-20 flex justify-center items-center gap-2">
-                <div class="spinner"></div><span id="status-text">กำลังเตรียมพร้อม AI และดึงฐานข้อมูล...</span>
+                <div class="spinner"></div><span id="status-text">กำลังโหลดและเตรียมพร้อมระบบ AI...</span>
             </div>
 
             <div class="p-8 w-full max-w-7xl mx-auto">
@@ -273,9 +255,11 @@
                             </form>
                         </div>
                         <div class="bg-slate-100 p-4 rounded-3xl border border-slate-200 flex flex-col items-center justify-center min-h-[380px]">
+                            <!-- แก้ไขโครงสร้างกล้องส่วนลงทะเบียนให้แสดง Canvas ซ้อนทับให้เห็นชัดๆ -->
                             <div class="camera-box border-4 border-dashed border-slate-300 rounded-2xl w-full aspect-video flex items-center justify-center bg-white overflow-hidden" id="enroll-cam-box">
                                 <i class="fa-solid fa-user text-6xl text-slate-300" id="en-icon"></i>
                                 <video id="en-vid" autoplay muted playsinline class="hidden"></video>
+                                <canvas id="en-can" class="hidden"></canvas>
                             </div>
                         </div>
                     </div>
@@ -297,7 +281,6 @@
         <!-- ส่วนหัว Header -->
         <header class="py-4 px-8 flex justify-between items-center z-10 relative">
             <div class="flex items-center gap-4">
-                <!-- โลโก้ตราโรงเรียน -->
                 <div class="w-20 h-20 rounded-full bg-white shadow-md border-2 border-amber-400 p-1 flex items-center justify-center overflow-hidden shrink-0">
                     <img id="kiosk-logo" src="https://via.placeholder.com/150" alt="School Logo" class="w-full h-full object-contain">
                 </div>
@@ -314,17 +297,19 @@
             </div>
         </header>
 
-        <!-- พื้นที่หลัก (ซ้าย: กล้อง + สถิติ / ขวา: รายการบันทึกล่าสุด) -->
+        <!-- พื้นที่หลัก -->
         <div class="flex-1 flex px-8 pb-8 gap-8 overflow-hidden z-10 relative">
             
-            <!-- ด้านซ้าย (70%): กล้อง + แถบสถิติด้านล่าง -->
+            <!-- ด้านซ้าย (70%) -->
             <div class="w-[68%] flex flex-col gap-4 h-full">
                 
-                <!-- กล้องสแกนใบหน้า -->
-                <div class="flex-1 rounded-[2.5rem] overflow-hidden border-[6px] border-slate-900 shadow-2xl relative bg-black flex items-center justify-center">
+                <!-- กล้องสแกนใบหน้า (มี Canvas ครอบทับตรงนี้ 100%) -->
+                <div class="flex-1 rounded-[2.5rem] overflow-hidden border-[6px] border-slate-900 shadow-2xl relative bg-black flex items-center justify-center camera-box">
                     <video id="kiosk-vid" autoplay muted playsinline class="hidden"></video>
+                    <!-- แผ่นกระจกสำหรับวาดกรอบ AI ให้แสดงเหนือกล้องตลอดเวลา -->
                     <canvas id="kiosk-can" class="hidden"></canvas>
-                    <div id="kiosk-placeholder" class="text-slate-500 text-xl font-bold flex flex-col items-center">
+                    
+                    <div id="kiosk-placeholder" class="text-slate-500 text-xl font-bold flex flex-col items-center z-20 absolute">
                         <i class="fa-solid fa-spinner fa-spin text-5xl mb-4 text-sky-400"></i> กำลังเชื่อมต่อกล้อง...
                     </div>
                 </div>
@@ -350,15 +335,12 @@
                 </div>
             </div>
 
-            <!-- ด้านขวา (32%): แถบสีชมพูรายการบันทึกล่าสุด -->
+            <!-- ด้านขวา (32%) -->
             <div class="w-[32%] bg-pink-500 rounded-[2.5rem] shadow-2xl border-4 border-pink-400 flex flex-col overflow-hidden">
-                <!-- หัวข้อแถบขวา -->
                 <div class="pt-4 pb-2 text-center shrink-0">
                     <h3 class="text-3xl font-black text-white drop-shadow">บันทึกล่าสุด</h3>
                     <p class="text-sm font-bold text-sky-100">รายการบันทึกเวลา</p>
                 </div>
-                
-                <!-- คอนเทนเนอร์ใส่ Feed รายชื่อนักเรียน (สกอร์บอร์ด) -->
                 <div id="kiosk-feed" class="flex-1 overflow-y-auto p-4 space-y-3.5 scrollbar-hide">
                     <div class="text-center text-white/70 font-bold mt-12 text-lg">รอการสแกนใบหน้า...</div>
                 </div>
@@ -367,11 +349,11 @@
         </div>
     </div>
 
-    <!-- ผ้าใบสำหรับ Crop รูปใบหน้าผู้เรียน -->
+    <!-- ผ้าใบสำหรับ Crop รูป -->
     <canvas id="crop-canvas" class="hidden"></canvas>
 
 
-    <!-- ================= 4. Firebase & Stable Application Logic ================= -->
+    <!-- ================= 4. Firebase & Core Logic ================= -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
@@ -391,23 +373,19 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // --- Global Variables (Stable Logic) ---
         let faceMatcher = null;
         let activeStream = null;
         let activeEnrollStream = null;
         
-        // ตัวควบคุม AI ให้ลื่นไหลและไม่ค้าง (Anti-Freeze mechanism)
         let isDetecting = false; 
         let isProcessingFrame = false; 
         
         let clockInterval = null;
         const cooldown = new Map();
         let studentsData = {};
-        
         let statData = { total: 0, ontime: 0, late: 0 };
         const scannedToday = new Set(); 
 
-        // --- Settings Management ---
         function loadSettings() {
             const sn = localStorage.getItem('cfg_school_name') || 'โรงเรียนอุทยานศึกษากระบี่';
             const logo = localStorage.getItem('cfg_logo_url') || 'https://via.placeholder.com/150';
@@ -422,14 +400,12 @@
         document.getElementById('save-settings-btn').onclick = () => {
             localStorage.setItem('cfg_school_name', document.getElementById('setting-school-name').value);
             localStorage.setItem('cfg_logo_url', document.getElementById('setting-logo-url').value);
-            
             const msg = document.getElementById('setting-msg');
             msg.innerText = "✅ บันทึกสำเร็จ";
             loadSettings();
             setTimeout(()=> msg.innerText='', 3000);
         };
 
-        // --- Auth Flow ---
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 document.getElementById('auth-view').classList.add('hidden');
@@ -454,6 +430,7 @@
         window.navTo = (sec) => {
             if(activeEnrollStream) { activeEnrollStream.getTracks().forEach(t => t.stop()); activeEnrollStream = null; }
             document.getElementById('en-vid').classList.add('hidden');
+            document.getElementById('en-can').classList.add('hidden');
             document.getElementById('en-icon').classList.remove('hidden');
             document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('bg-sky-500'); });
             document.getElementById('nav-'+sec).classList.add('bg-sky-500');
@@ -462,7 +439,6 @@
             if(sec === 'dashboard') fetchReports();
         };
 
-        // --- AI Initialization & Database Sync ---
         async function initAI() {
             try {
                 const URI = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
@@ -473,10 +449,10 @@
                 ]);
                 await syncDB();
                 document.getElementById('status-bar').classList.replace('bg-slate-800', 'bg-emerald-600');
-                document.getElementById('status-text').innerText = "✅ ระบบเสถียร AI และฐานข้อมูลพร้อมทำงาน";
+                document.getElementById('status-text').innerText = "✅ ระบบเสถียร AI พร้อมวาดกรอบใบหน้าแล้ว";
                 document.querySelector('.spinner').style.display = 'none';
                 setTimeout(() => document.getElementById('status-bar').style.display = 'none', 3000);
-            } catch (e) { alert("โหลด AI ล้มเหลว กรุณารีเฟรชหน้าจอ"); }
+            } catch (e) { alert("โหลด AI ล้มเหลว โปรดตรวจสอบอินเทอร์เน็ต"); }
         }
 
         async function syncDB() {
@@ -497,20 +473,20 @@
                     studentsData[d.studentId] = d;
                 }
             });
-            // 0.42 คือค่าที่แม่นยำที่สุด ป้องกันการจำผิดเวลาเดินผ่านกล้องไวๆ
+            // ถึงไม่มีข้อมูลนักเรียน ก็สร้าง Matcher ให้เป็น null ไว้ก่อน เพื่อให้กรอบตรวจจับยังขึ้นเป็น "ไม่พบข้อมูล"
             faceMatcher = labels.length > 0 ? new faceapi.FaceMatcher(labels, 0.42) : null;
         }
 
         document.getElementById('force-sync-btn').onclick = async () => {
             localStorage.removeItem('school_students_cache');
             await syncDB(); 
-            alert("อัปเดตซิงค์ฐานข้อมูลนักเรียนจากคลาวด์เรียบร้อยแล้ว");
+            alert("อัปเดตฐานข้อมูลสำเร็จ");
         };
 
-        // --- Registration / Enrollment ---
+        // --- Enrollment Logic ---
         document.getElementById('start-enroll-btn').onclick = async () => {
             try {
-                activeEnrollStream = await navigator.mediaDevices.getUserMedia({video: true});
+                activeEnrollStream = await navigator.mediaDevices.getUserMedia({video: { facingMode: "user" }});
                 const v = document.getElementById('en-vid');
                 v.srcObject = activeEnrollStream;
                 v.classList.remove('hidden');
@@ -518,7 +494,7 @@
                 document.getElementById('enroll-cam-box').classList.add('border-sky-500');
                 document.getElementById('save-enroll-btn').disabled = false;
             } catch(e) {
-                alert("ไม่สามารถเปิดกล้องได้ โปรดตรวจสอบการอนุญาตใช้งานกล้อง");
+                alert("ไม่สามารถเปิดกล้องได้");
             }
         };
 
@@ -526,12 +502,11 @@
             e.preventDefault();
             if(!activeEnrollStream) return alert("กรุณาเปิดกล้องก่อน");
             const btn = document.getElementById('save-enroll-btn');
-            btn.disabled = true; btn.innerText = "กำลังประมวลผล...";
+            btn.disabled = true; btn.innerText = "กำลังสกัดใบหน้า...";
             
             try {
-                // เกณฑ์ลงทะเบียนง่ายขึ้น (scoreThreshold 0.3)
-                const det = await faceapi.detectSingleFace(document.getElementById('en-vid'), new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 })).withFaceLandmarks().withFaceDescriptor();
-                if(!det) throw new Error("ไม่พบใบหน้า กรุณาให้หน้าอยู่ในกล้องให้ชัดเจนที่สุด");
+                const det = await faceapi.detectSingleFace(document.getElementById('en-vid'), new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.2 })).withFaceLandmarks().withFaceDescriptor();
+                if(!det) throw new Error("ตรวจไม่พบโครงหน้า กรุณามองตรงให้หน้าอยู่ในกล้องชัดๆ");
                 
                 await addDoc(collection(db, "students"), {
                     studentId: document.getElementById('en-id').value,
@@ -557,7 +532,7 @@
             } finally { btn.disabled = false; btn.innerHTML = "2. สกัดโครงหน้าและบันทึกข้อมูล"; }
         };
 
-        // --- KIOSK MODE Engine ---
+        // --- KIOSK MODE Logic ---
         const kioskVid = document.getElementById('kiosk-vid');
         const kioskCan = document.getElementById('kiosk-can');
         const feedContainer = document.getElementById('kiosk-feed');
@@ -572,12 +547,10 @@
             document.getElementById('stat-late').innerText = statData.late;
         }
 
-        // ระบบตัดรูปใบหน้ากัน Error (Safe Crop)
         function captureFaceCrop(box) {
             try {
                 const ctx = cropCanvas.getContext('2d');
                 const pad = 20; 
-                // ป้องกันพิกัดติดลบเวลาเดินตกขอบกล้อง
                 const x = Math.max(0, box.x - pad);
                 const y = Math.max(0, box.y - pad);
                 const w = Math.min(kioskVid.videoWidth - x, box.width + pad * 2);
@@ -592,7 +565,7 @@
                 ctx.scale(-1, 1);
                 ctx.drawImage(kioskVid, x, y, w, h, 0, 0, w, h);
                 
-                return cropCanvas.toDataURL('image/jpeg', 0.7); // 0.7 ลดขนาดรูปลงเพื่อให้เร็วขึ้น
+                return cropCanvas.toDataURL('image/jpeg', 0.7);
             } catch (e) {
                 return 'https://via.placeholder.com/150';
             }
@@ -617,7 +590,7 @@
                     <div class="flex-1 bg-sky-50 border-2 border-sky-200 rounded-2xl p-2.5 text-center shadow-sm">
                         <p class="font-extrabold text-slate-900 text-sm leading-tight">${student.studentId}</p>
                         <p class="font-extrabold text-slate-800 text-xs mt-0.5 truncate">${student.name}</p>
-                        <p class="text-[10px] font-bold text-slate-500 mt-0.5 truncate">${student.level || 'ชั้นมัธยมศึกษา'}</p>
+                        <p class="text-[10px] font-bold text-slate-500 mt-0.5 truncate">${student.level || 'ชั้นเรียน'}</p>
                         <p class="font-black text-base ${timeCol} mt-1">${timeStr} น.</p>
                     </div>
                 `;
@@ -630,20 +603,17 @@
                         </div>
                     </div>
                     <div class="flex-1 bg-sky-50 border-2 border-sky-200 rounded-2xl p-3 text-center shadow-sm">
-                        <p class="font-extrabold text-rose-600 text-sm">ไม่พบรายชื่อในระบบ</p>
-                        <p class="text-[11px] font-bold text-slate-500 mt-1">โปรดลงทะเบียนก่อน</p>
+                        <p class="font-extrabold text-rose-600 text-sm">ไม่พบข้อมูลใบหน้า</p>
+                        <p class="text-[11px] font-bold text-slate-500 mt-1">AI แจ้งเตือน: ไม่ตรงฐานข้อมูล</p>
                     </div>
                 `;
             }
 
             feedContainer.insertBefore(card, feedContainer.firstChild);
-            // ลบการ์ดเก่าออกเพื่อป้องกันหน่วยความจำเต็ม
             if(feedContainer.children.length > 8) feedContainer.lastChild.remove();
         }
 
         document.getElementById('open-kiosk-btn').onclick = async () => {
-            if(!faceMatcher) return alert("AI ยังไม่พร้อม หรือยังไม่มีข้อมูลนักเรียนในระบบ");
-            
             KIOSK_GATE = document.getElementById('setup-kiosk-name').value;
             LATE_TIME = document.getElementById('setup-time-late').value;
             feedContainer.innerHTML = '';
@@ -652,9 +622,9 @@
             document.getElementById('kiosk-layout').classList.add('active');
             
             try {
-                // ขอความละเอียดระดับ 720p ก็เพียงพอต่อการสแกน และไม่ทำให้คอมค้าง
+                // บังคับใช้กล้องหน้า (facingMode: user) และขนาดที่เหมาะสมกับ iPad
                 activeStream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: { ideal: 1280 }, height: { ideal: 720 } }
+                    video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }
                 });
                 kioskVid.srcObject = activeStream;
                 kioskVid.classList.remove('hidden');
@@ -685,11 +655,9 @@
         }
         document.getElementById('exit-kiosk-btn').onclick = exitKioskMode;
 
-        // --- ระบบ AI Lock ป้องกันคอมค้าง (Stable Async Loop) ---
+        // --- ระบบล็อกการประมวลผล (iPad Anti-Freeze) ---
         async function runFaceDetectionLoop() {
             if (!isDetecting) return;
-            
-            // ถ้าระบบกำลังคิดอยู่ ห้ามสั่งงานซ้อน (นี่คือตัวที่ทำให้เครื่องไม่ค้าง)
             if (isProcessingFrame) {
                 requestAnimationFrame(runFaceDetectionLoop);
                 return;
@@ -698,7 +666,15 @@
             isProcessingFrame = true;
 
             try {
-                const dets = await faceapi.detectAllFaces(kioskVid, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }))
+                // เช็คอัปเดตขนาด Canvas ตลอดเวลา ป้องกันการแสดงผลเบี้ยวบน iPad
+                if (kioskCan.width !== kioskVid.videoWidth || kioskCan.height !== kioskVid.videoHeight) {
+                    kioskCan.width = kioskVid.videoWidth;
+                    kioskCan.height = kioskVid.videoHeight;
+                    faceapi.matchDimensions(kioskCan, kioskVid);
+                }
+
+                // ลด Threshold ลงเหลือ 0.2 เพื่อให้มันจับหน้าคนได้ง่ายมากๆ (แม้จะเดินผ่านไวๆ หรือขยับตัว)
+                const dets = await faceapi.detectAllFaces(kioskVid, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.2 }))
                                           .withFaceLandmarks().withFaceDescriptors();
                                           
                 const resDets = faceapi.resizeResults(dets, kioskVid);
@@ -706,19 +682,34 @@
                 ctx.clearRect(0,0,kioskCan.width,kioskCan.height);
                 
                 for(const d of resDets) {
-                    const match = faceMatcher.findBestMatch(d.descriptor);
                     const box = d.detection.box;
+                    let isKnown = false;
+                    let matchedStudent = null;
+                    let labelText = "ไม่พบข้อมูล";
+                    let boxColor = '#f43f5e'; // สีแดงเริ่มต้น (หาไม่เจอ)
 
-                    if(match.label !== 'unknown') {
-                        const sid = match.label;
-                        const student = studentsData[sid];
+                    // ตรวจสอบกับฐานข้อมูล (ถ้ามี)
+                    if (faceMatcher) {
+                        const match = faceMatcher.findBestMatch(d.descriptor);
+                        if(match.label !== 'unknown') {
+                            isKnown = true;
+                            matchedStudent = studentsData[match.label];
+                            labelText = matchedStudent.name;
+                            boxColor = '#10b981'; // เจอข้อมูล เปลี่ยนกรอบเป็นสีเขียว
+                        }
+                    }
+
+                    // บังคับวาดกรอบลง Canvas ทันทีที่ประมวลผลเสร็จ เพื่อให้เห็นกรอบตลอดเวลา
+                    new faceapi.draw.DrawBox(box, {label: labelText, boxColor: boxColor}).draw(kioskCan);
+                    
+                    // ระบบบันทึกเข้า Database (มี Cooldown 5 นาที)
+                    if (isKnown && matchedStudent) {
+                        const sid = matchedStudent.studentId;
                         const now = new Date();
                         const nowMs = now.getTime();
                         
-                        new faceapi.draw.DrawBox(box, {label: student.name, boxColor: '#10b981'}).draw(kioskCan);
-                        
                         const lastScanTime = cooldown.get(sid) || 0;
-                        if(nowMs - lastScanTime > 300000) { // Cooldown 5 นาที
+                        if(nowMs - lastScanTime > 300000) { 
                             cooldown.set(sid, nowMs);
                             
                             const timeStr = now.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'});
@@ -732,12 +723,12 @@
                             }
 
                             const faceCropImg = captureFaceCrop(box);
-                            addFeedCard(student, status, timeStr, faceCropImg, true);
+                            addFeedCard(matchedStudent, status, timeStr, faceCropImg, true);
                             
                             addDoc(collection(db, "attendance"), {
                                 studentId: sid,
-                                name: student.name,
-                                level: student.level || '-',
+                                name: matchedStudent.name,
+                                level: matchedStudent.level || '-',
                                 gate: KIOSK_GATE,
                                 status: status,
                                 method: "Face Scan",
@@ -745,11 +736,9 @@
                             }).catch(err => console.log("Firebase Log Error:", err));
                         }
                     } else {
-                        new faceapi.draw.DrawBox(box, {label: "ไม่รู้จัก", boxColor: '#f43f5e'}).draw(kioskCan);
-                        
-                        // ระบบป้องกันการยิงรูปหน้าคนแปลกหน้าซ้ำๆ (หน่วงเวลา Unknown)
+                        // ป้องกันการยิงหน้าจอซ้ำๆ ตอนคนแปลกหน้ายืนแช่
                         const unknownTime = cooldown.get('unknown_block') || 0;
-                        if(new Date().getTime() - unknownTime > 3000) {
+                        if(new Date().getTime() - unknownTime > 4000) {
                             cooldown.set('unknown_block', new Date().getTime());
                             const faceCropImg = captureFaceCrop(box);
                             addFeedCard({}, "มาสาย", "--:--", faceCropImg, false);
@@ -757,23 +746,31 @@
                     }
                 }
             } catch (e) { 
-                // Ignore silent errors during stream startup/teardown
+                // ซ่อน Error ไม่ให้รบกวนหน้าจอ
             }
 
             isProcessingFrame = false;
             
-            // ให้เบราว์เซอร์พักหายใจ 100ms ก่อนเริ่มเฟรมใหม่ (สำคัญมาก ป้องกันความร้อน)
+            // หน่วงเวลา 150ms ก่อนรันรอบต่อไป เพื่อลดความร้อนบน iPad และไม่ให้ Safari ค้าง
             setTimeout(() => {
                 if(isDetecting) requestAnimationFrame(runFaceDetectionLoop);
-            }, 100);
+            }, 150);
         }
 
-        kioskVid.onplay = () => {
+        // ฟังชันก์ตรวจจับและบังคับลูปให้ทำงานแน่นอนร้อยเปอร์เซ็นต์
+        kioskVid.addEventListener('loadeddata', async () => {
+            // รอจนกว่ากล้องจะส่งค่าความกว้างมาจริงๆ ป้องกันการคำนวณกรอบสี่เหลี่ยมผิดพลาด
+            while(kioskVid.videoWidth === 0) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            kioskCan.width = kioskVid.videoWidth;
+            kioskCan.height = kioskVid.videoHeight;
             faceapi.matchDimensions(kioskCan, kioskVid);
+            
             isDetecting = true;
             isProcessingFrame = false;
-            runFaceDetectionLoop(); // เริ่มระบบลูป
-        };
+            runFaceDetectionLoop(); // เริ่มระบบลูปวาดกรอบ
+        });
 
         // --- Reports & Excel Export ---
         async function fetchReports() {
@@ -823,7 +820,6 @@
                     } else if (filter === 'this_month') {
                         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
                     }
-                    // หมายเหตุ: Firestore ต้องมีการทำ Index ไว้สำหรับ query แบบนี้
                     q = query(collRef, orderBy("timestamp", "desc")); 
                 }
 
@@ -838,7 +834,6 @@
                     const d = doc.data();
                     const dateObj = d.timestamp ? d.timestamp.toDate() : null;
                     
-                    // Manual filter for safety if Firebase Index is not set up
                     if(filter === 'today' && dateObj) {
                         const today = new Date();
                         if(dateObj.getDate() !== today.getDate() || dateObj.getMonth() !== today.getMonth()) return;
