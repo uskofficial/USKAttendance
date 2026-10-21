@@ -336,7 +336,7 @@
     </div>
 
 
-    <!-- ================= 4. หน้าจอ KIOSK เต็มหน้าจอ (ตรงตามภาพอ้างอิง) ================= -->
+    <!-- ================= 4. หน้าจอ KIOSK เต็มหน้าจอ ================= -->
     <div id="kiosk-layout">
         
         <!-- ลายเส้นกราฟิกพื้นหลัง -->
@@ -450,15 +450,14 @@
         let clockInterval = null;
         let enrollLoopId = 0;
         
-        let studentsData = {}; // เก็บข้อมูลนักเรียนทั้งหมดจาก DB
+        let studentsData = {}; 
         let statData = { total: 0, ontime: 0, late: 0 };
         
-        // [ANTI-SPAM] ตัวแปรจดจำคนที่สแกนไปแล้วในวันนี้ (รีเซ็ตเมื่อรีเฟรชหน้าเว็บ)
         const scannedToday = new Set(); 
-        const unknownCooldown = new Map();
 
         const DETECT_SCORE = 0.4;
-        const MATCH_THRESHOLD = 0.42;
+        // ปรับค่าความแม่นยำ (Threshold) จากเดิม 0.42 (เข้มงวดมาก) เป็น 0.48 (เพื่อให้จดจำใบหน้าได้ง่ายและแม่นยำขึ้นแม้แสงเปลี่ยน)
+        const MATCH_THRESHOLD = 0.48;
 
         // --- ระบบตั้งค่าทั่วไป ---
         function loadSettings() {
@@ -539,7 +538,7 @@
             const snap = await getDocs(collection(db, "students"));
             snap.forEach(doc => {
                 const data = doc.data();
-                data.docId = doc.id; // เก็บ ID Document เผื่อใช้ลบ/แก้ไข
+                data.docId = doc.id; 
                 rawData.push(data);
             });
             localStorage.setItem('school_students_cache', JSON.stringify(rawData));
@@ -549,7 +548,7 @@
             rawData.forEach(d => {
                 if(d.descriptor) {
                     labels.push(new faceapi.LabeledFaceDescriptors(d.studentId, [new Float32Array(d.descriptor)]));
-                    studentsData[d.studentId] = d; // จัดเก็บแบบ Map ง่ายต่อการดึง
+                    studentsData[d.studentId] = d; 
                 }
             });
             faceMatcher = labels.length > 0 ? new faceapi.FaceMatcher(labels, MATCH_THRESHOLD) : null;
@@ -633,19 +632,17 @@
         };
 
         // --- ระบบลงทะเบียน (Enrollment) ---
-        // ครอปหน้าจากวิดีโอเพื่อบันทึกเป็น Profile Image
         function captureProfileImage() {
             const v = document.getElementById('en-vid');
             const c = document.getElementById('crop-canvas');
             const ctx = c.getContext('2d');
-            // ครอปเฉพาะส่วนกลางของวิดีโอ (หน้าคน)
             const size = Math.min(v.videoWidth, v.videoHeight);
             const startX = (v.videoWidth - size) / 2;
             const startY = (v.videoHeight - size) / 2;
-            c.width = 300; c.height = 375; // อัตราส่วน 4:5 สำหรับรูปโปรไฟล์
-            ctx.translate(c.width, 0); ctx.scale(-1, 1); // พลิกภาพให้ตรงกระจก
+            c.width = 300; c.height = 375; 
+            ctx.translate(c.width, 0); ctx.scale(-1, 1); 
             ctx.drawImage(v, startX, startY, size, size, 0, 0, c.width, c.height);
-            return c.toDataURL('image/jpeg', 0.6); // ย่อขนาดเพื่อไม่ให้หนัก DB
+            return c.toDataURL('image/jpeg', 0.6); 
         }
 
         document.getElementById('start-enroll-btn').onclick = async () => {
@@ -672,7 +669,7 @@
                 const det = await faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.2 })).withFaceLandmarks().withFaceDescriptor();
                 if(!det) throw new Error("ตรวจไม่พบโครงหน้า กรุณามองตรงให้หน้าอยู่ในกล้องชัดๆ");
                 
-                const profileImgBase64 = captureProfileImage(); // ดึงภาพ
+                const profileImgBase64 = captureProfileImage(); 
                 
                 await addDoc(collection(db, "students"), {
                     studentId: document.getElementById('en-id').value,
@@ -680,7 +677,7 @@
                     level: document.getElementById('en-class').value,
                     major: document.getElementById('en-major').value,
                     descriptor: Array.from(det.descriptor),
-                    profileImg: profileImgBase64, // บันทึกรูปเข้า DB
+                    profileImg: profileImgBase64, 
                     createdAt: serverTimestamp()
                 });
                 
@@ -699,7 +696,6 @@
             } finally { btn.disabled = false; btn.innerHTML = "2. บันทึกข้อมูลและรูปภาพเข้าสู่ระบบ"; }
         };
 
-        // กรอบ AI ตอนลงทะเบียน
         async function startEnrollDetection() {
             const v = document.getElementById('en-vid');
             const c = document.getElementById('en-can');
@@ -778,48 +774,31 @@
             } catch (e) { return 'https://via.placeholder.com/150'; }
         }
 
-        // [อัปเกรด] การ์ด Feed ให้แสดง 2 รูปภาพ (สแกนสด และ ภาพโปรไฟล์จากฐานข้อมูล)
-        function addFeedCard(student, statusStr, timeStr, liveImgData, isMatched) {
+        // แสดงการ์ดเฉพาะตอนสแกนเจอและมีข้อมูลในฐานระบบเท่านั้น (ลบการโชว์ unknown ออกไป)
+        function addFeedCard(student, statusStr, timeStr, liveImgData) {
             const isLate = statusStr === "มาสาย";
             const timeCol = isLate ? 'text-rose-600' : 'text-emerald-600';
-            const badgeIcon = isMatched ? (isLate ? 'fa-check text-white bg-emerald-500' : 'fa-check text-white bg-emerald-500') : 'fa-xmark text-white bg-rose-500';
+            const badgeIcon = isLate ? 'fa-check text-white bg-emerald-500' : 'fa-check text-white bg-emerald-500';
 
             const card = document.createElement('div');
             card.className = `feed-card bg-white p-2.5 rounded-3xl shadow-sm border border-pink-200 flex gap-3 items-center`;
             
-            if (isMatched) {
-                const profileImg = student.profileImg || 'https://via.placeholder.com/150';
-                card.innerHTML = `
-                    <!-- แสดง 2 รูปคู่กัน -->
-                    <div class="flex gap-1.5 shrink-0 relative">
-                        <img src="${liveImgData}" class="w-14 h-16 object-cover rounded-xl border-2 border-slate-100 shadow-sm" alt="Live Scan">
-                        <img src="${profileImg}" class="w-14 h-16 object-cover rounded-xl border-2 border-slate-100 shadow-sm" alt="Profile">
-                        <div class="absolute -bottom-2 -right-2 w-6 h-6 rounded-full ${badgeIcon} flex items-center justify-center text-[10px] font-bold shadow-md border-2 border-white">
-                            <i class="fa-solid ${isMatched ? 'fa-check' : 'fa-xmark'}"></i>
-                        </div>
+            const profileImg = student.profileImg || 'https://via.placeholder.com/150';
+            card.innerHTML = `
+                <div class="flex gap-1.5 shrink-0 relative">
+                    <img src="${liveImgData}" class="w-14 h-16 object-cover rounded-xl border-2 border-slate-100 shadow-sm" alt="Live Scan">
+                    <img src="${profileImg}" class="w-14 h-16 object-cover rounded-xl border-2 border-slate-100 shadow-sm" alt="Profile">
+                    <div class="absolute -bottom-2 -right-2 w-6 h-6 rounded-full ${badgeIcon} flex items-center justify-center text-[10px] font-bold shadow-md border-2 border-white">
+                        <i class="fa-solid fa-check"></i>
                     </div>
-                    <!-- ข้อมูลฝั่งขวา -->
-                    <div class="flex-1 text-left min-w-0">
-                        <p class="font-extrabold text-slate-800 text-sm leading-tight truncate">${student.studentId}</p>
-                        <p class="font-extrabold text-slate-900 text-[13px] mt-0.5 truncate">${student.name}</p>
-                        <p class="text-[10px] font-bold text-slate-500 mt-0.5 truncate">${student.level || '-'} • ${student.major || '-'}</p>
-                        <p class="font-black text-sm ${timeCol} mt-0.5">${timeStr} น.</p>
-                    </div>
-                `;
-            } else {
-                card.innerHTML = `
-                    <div class="relative w-16 h-20 shrink-0 rounded-2xl overflow-hidden border-2 border-white shadow-md bg-slate-200">
-                        <img src="${liveImgData}" class="w-full h-full object-cover">
-                        <div class="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs font-bold shadow-md">
-                            <i class="fa-solid fa-xmark"></i>
-                        </div>
-                    </div>
-                    <div class="flex-1 bg-sky-50 border-2 border-sky-200 rounded-2xl p-3 text-center shadow-sm">
-                        <p class="font-extrabold text-rose-600 text-sm">ไม่พบข้อมูลใบหน้า</p>
-                        <p class="text-[11px] font-bold text-slate-500 mt-1">โปรดแจ้งปัญหากับคุณครู</p>
-                    </div>
-                `;
-            }
+                </div>
+                <div class="flex-1 text-left min-w-0">
+                    <p class="font-extrabold text-slate-800 text-sm leading-tight truncate">${student.studentId}</p>
+                    <p class="font-extrabold text-slate-900 text-[13px] mt-0.5 truncate">${student.name}</p>
+                    <p class="text-[10px] font-bold text-slate-500 mt-0.5 truncate">${student.level || '-'} • ${student.major || '-'}</p>
+                    <p class="font-black text-sm ${timeCol} mt-0.5">${timeStr} น.</p>
+                </div>
+            `;
 
             feedContainer.insertBefore(card, feedContainer.firstChild);
             if(feedContainer.children.length > 8) feedContainer.lastChild.remove();
@@ -886,13 +865,15 @@
                 const ctx = kioskCan.getContext('2d');
                 ctx.clearRect(0,0,kioskCan.width,kioskCan.height);
                 
-                if (!faceMatcher) setAIStatus(`⚠ ยังไม่มีข้อมูลนักเรียน • พบ ${resDets.length}`, true);
-                else setAIStatus(`🟢 AI ทำงาน • สแกนพบ ${resDets.length} หน้า • นักเรียนในระบบ ${Object.keys(studentsData).length} คน`);
+                if (!faceMatcher) setAIStatus(`⚠ ยังไม่มีข้อมูลนักเรียนในฐานข้อมูล`, true);
+                else setAIStatus(`🟢 AI ทำงาน • พบใบหน้า ${resDets.length} หน้า`);
                 
                 for(const d of resDets) {
                     const box = d.detection.box;
-                    let isKnown = false; let matchedStudent = null;
-                    let labelText = "ไม่พบข้อมูล"; let boxColor = '#f43f5e'; 
+                    let isKnown = false; 
+                    let matchedStudent = null;
+                    let labelText = "ไม่พบข้อมูล"; 
+                    let boxColor = '#f43f5e'; 
                     let sid = 'unknown';
 
                     if (faceMatcher) {
@@ -901,8 +882,9 @@
                             sid = match.label;
                             matchedStudent = studentsData[sid];
                             
-                            // [ANTI-SPAM] ถ้านักเรียนคนนี้สแกนไปแล้วในวันนี้ ให้ข้ามการวาดกรอบและการบันทึกไปเลย
                             if (scannedToday.has(sid)) {
+                                // ถ้าสแกนไปแล้วให้วาดกรอบสีเขียวแจ้งชื่อ แต่จะไม่ทำอะไรเพิ่มเติม
+                                drawFaceBox(ctx, box, matchedStudent.name, '#10b981');
                                 continue; 
                             }
                             
@@ -912,11 +894,12 @@
                         }
                     }
 
-                    // วาดกรอบบนจอ
+                    // วาดกรอบหน้าจอ
                     drawFaceBox(ctx, box, labelText, boxColor);
                     
+                    // บันทึกเฉพาะกรณีที่เป็นนักเรียนในระบบ (isKnown = true) เท่านั้น
+                    // จะไม่มีคำสั่งแจ้งเตือนหน้าคนแปลกหน้าลงการ์ดขวามืออีกต่อไป
                     if (isKnown && matchedStudent) {
-                        // เพิ่มนักเรียนลงใน Set ว่าสแกนวันนี้แล้ว (จะไม่สแกนซ้ำอีก)
                         scannedToday.add(sid);
                         
                         const now = new Date();
@@ -928,7 +911,9 @@
                         updateKioskStats();
 
                         const faceCropImg = captureFaceCrop(box);
-                        addFeedCard(matchedStudent, status, timeStr, faceCropImg, true);
+                        
+                        // สร้างการ์ดแสดงผลบนจอขวามือ
+                        addFeedCard(matchedStudent, status, timeStr, faceCropImg);
                         
                         addDoc(collection(db, "attendance"), {
                             studentId: sid,
@@ -940,15 +925,6 @@
                             method: "Face Scan",
                             timestamp: serverTimestamp()
                         }).catch(err => console.log("Firebase Log Error:", err));
-                        
-                    } else if (!isKnown) {
-                        // คนแปลกหน้า หน่วงเวลาไม่ให้แจ้งเตือนรัวๆ
-                        const uTime = unknownCooldown.get('u') || 0;
-                        if(new Date().getTime() - uTime > 4000) {
-                            unknownCooldown.set('u', new Date().getTime());
-                            const faceCropImg = captureFaceCrop(box);
-                            addFeedCard({}, "มาสาย", "--:--", faceCropImg, false);
-                        }
                     }
                 }
             } catch (e) { }
@@ -1003,7 +979,7 @@
                 if (snap.empty) { alert("ไม่มีข้อมูลในระบบ"); return; }
 
                 const rawDataRows = [["วัน-เวลาที่สแกน", "สถานะ", "รหัสนักเรียน", "ชื่อ-นามสกุล", "ระดับชั้น", "สายการเรียน", "จุดสแกนประตู"]];
-                const statsMap = {}; // เพื่อคำนวณสถิติรายบุคคล
+                const statsMap = {}; 
 
                 snap.forEach(doc => {
                     const d = doc.data();
@@ -1020,12 +996,10 @@
                     const dateStr = dateObj ? dateObj.toLocaleString('th-TH') : "";
                     const nameKey = d.name || 'ไม่ทราบชื่อ';
                     
-                    // เพิ่มแถวข้อมูลดิบ
                     rawDataRows.push([
                         dateStr, d.status, d.studentId, d.name, d.level || "-", d.major || "-", d.gate || "-"
                     ]);
 
-                    // คำนวณสถิติ
                     if(!statsMap[nameKey]) {
                         statsMap[nameKey] = { id: d.studentId, level: d.level||"-", major: d.major||"-", normal: 0, late: 0, total: 0 };
                     }
@@ -1036,7 +1010,6 @@
 
                 if(rawDataRows.length === 1) { alert("ไม่มีข้อมูลในขอบเขตเวลาที่เลือก"); return; }
 
-                // สร้างหน้าสรุปสถิติ เรียงตามชื่อนักเรียน
                 const statsRows = [["รหัสนักเรียน", "ชื่อ-นามสกุล", "ระดับชั้น", "สายการเรียน", "มาปกติ (ครั้ง)", "มาสาย (ครั้ง)", "รวมทั้งหมด (ครั้ง)"]];
                 const sortedNames = Object.keys(statsMap).sort();
                 sortedNames.forEach(name => {
@@ -1044,7 +1017,6 @@
                     statsRows.push([st.id, name, st.level, st.major, st.normal, st.late, st.total]);
                 });
 
-                // สร้าง Workbook และเพิ่มลงไป 2 หน้า (Sheets)
                 const wb = XLSX.utils.book_new();
                 const wsLog = XLSX.utils.aoa_to_sheet(rawDataRows);
                 const wsStats = XLSX.utils.aoa_to_sheet(statsRows);
